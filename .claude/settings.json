@@ -1,0 +1,22 @@
+{
+  "enabledMcpjsonServers": [
+    "next-devtools",
+    "context7",
+    "playwright",
+    "sequential-thinking",
+    "filesystem"
+  ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/security_reminder_hook.py"
+          }
+        ]
+      }
+    ]
+  }
+}
