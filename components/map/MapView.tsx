@@ -4,6 +4,7 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { Resource, ResourceCategory } from "@/types";
 import { CATEGORY_CONFIG } from "@/lib/utils";
+import { buildMarkerElement } from "@/lib/mapbox";
 import { useTheme } from "@/lib/theme";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
@@ -164,21 +165,11 @@ export function MapView({
     filtered.forEach(resource => {
       const cat = CATEGORY_CONFIG[resource.category];
 
-      const el = document.createElement("div");
+      const el = buildMarkerElement({ category: resource.category, urgent: resource.urgent });
       el.setAttribute("role", "button");
       el.setAttribute("aria-label", `${resource.name} — ${cat.label}`);
       el.setAttribute("tabindex", "0");
-      el.style.cssText = `
-        width: ${resource.urgent ? 18 : 14}px;
-        height: ${resource.urgent ? 18 : 14}px;
-        border-radius: 50%;
-        background: ${resource.urgent ? "#ef4444" : cat.color};
-        border: 2px solid ${resource.urgent ? "#fca5a5" : "rgba(255,255,255,0.3)"};
-        box-shadow: 0 0 ${resource.urgent ? 16 : 10}px ${resource.urgent ? "#ef444466" : cat.color + "66"};
-        cursor: pointer;
-        transition: transform 0.15s;
-        z-index: 1;
-      `;
+      el.style.transition = "transform 0.15s";
       el.onmouseenter = () => { el.style.transform = "scale(1.4)"; };
       el.onmouseleave = () => { el.style.transform = "scale(1)"; };
       // Clicking a marker selects its state (and stops propagation to the map)
