@@ -13,6 +13,12 @@ const MAP_STYLES: Record<"dark" | "light", string> = {
   light: "mapbox://styles/mapbox/light-v11",
 };
 
+// US bounding box — ignore clicks outside continental US / territories
+const US_BOUNDS: [[number, number], [number, number]] = [
+  [-180, 15],
+  [-60,  72],
+];
+
 interface MapViewProps {
   resources: Resource[];
   selectedState: string | null;
@@ -34,7 +40,22 @@ const STATE_CENTROIDS: Record<string, [number, number]> = {
   OK:[-97.5,35.5],OR:[-120.5,44.0],PA:[-77.2,40.9],RI:[-71.6,41.6],SC:[-80.9,33.8],
   SD:[-100.2,44.4],TN:[-86.7,35.8],TX:[-99.3,31.4],UT:[-111.1,39.3],VT:[-72.7,44.0],
   VA:[-78.5,37.5],WA:[-120.5,47.5],WV:[-80.6,38.6],WI:[-89.8,44.2],WY:[-107.6,43.0],
+  DC:[-77.0,38.9],PR:[-66.5,18.2],
 };
+
+/** Reverse-geocode a lng/lat to a 2-letter US state code via Mapbox */
+async function reverseGeocodeState(lng: number, lat: number): Promise<string | null> {
+  try {
+    const url =
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json` +
+      `?types=region&country=US&access_token=${mapboxgl.accessToken}`;
+    const res  = await fetch(url);
+    const json = await res.json() as { features?: Array<{ properties?: { short_code?: string } }> };
+    const code = json.features?.[0]?.properties?.short_code; // e.g. "US-NY"
+    if (code?.startsWith("US-")) return code.slice(3).toUpperCase();
+  } catch { /* ignore */ }
+  return null;
+}
 
 export function MapView({
   resources,
@@ -45,13 +66,15 @@ export function MapView({
   onMobilePanelToggle,
 }: MapViewProps) {
   const { theme } = useTheme();
-  const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
-  const markersRef = useRef<mapboxgl.Marker[]>([]);
-  const [mapLoaded, setMapLoaded] = useState(false);
-  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 37.09, lng: -95.71 });
+  const mapContainer  = useRef<HTMLDivElement>(null);
+  const map           = useRef<mapboxgl.Map | null>(null);
+  const markersRef    = useRef<mapboxgl.Marker[]>([]);
+  const geocodingRef  = useRef(false); // debounce reverse-geocode requests
+  const [mapLoaded, setMapLoaded]   = useState(false);
+  const [clicking, setClicking]     = useState(false);
+  const [mapCenter, setMapCenter]   = useState<{ lat: number; lng: number }>({ lat: 37.09, lng: -95.71 });
 
-  // Init map
+  // ── Init map ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
@@ -65,29 +88,58 @@ export function MapView({
     });
 
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
-    map.current.on("load", () => setMapLoaded(true));
+
+    map.current.on("load", () => {
+      setMapLoaded(true);
+
+      // Show pointer cursor over the map to hint it's clickable
+      map.current!.getCanvas().style.cursor = "pointer";
+    });
+
     map.current.on("moveend", () => {
       if (!map.current) return;
       const c = map.current.getCenter();
       setMapCenter({ lat: c.lat, lng: c.lng });
     });
 
+    // ── Click anywhere on map → reverse-geocode → select state ──────────────
+    map.current.on("click", async (e) => {
+      if (geocodingRef.current) return; // already processing a click
+      const { lng, lat } = e.lngLat;
+
+      // Rough US bounding box check before hitting the API
+      if (
+        lng < US_BOUNDS[0][0] || lng > US_BOUNDS[1][0] ||
+        lat < US_BOUNDS[0][1] || lat > US_BOUNDS[1][1]
+      ) return;
+
+      geocodingRef.current = true;
+      setClicking(true);
+      try {
+        const stateCode = await reverseGeocodeState(lng, lat);
+        if (stateCode) onSelectState(stateCode);
+      } finally {
+        geocodingRef.current = false;
+        setClicking(false);
+      }
+    });
+
     return () => { map.current?.remove(); map.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Switch map style on theme change (after initial load)
+  // ── Switch map style when theme changes ───────────────────────────────────
   const themeRef = useRef(theme);
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
-    if (themeRef.current === theme) return; // skip identical
+    if (themeRef.current === theme) return;
     themeRef.current = theme;
     map.current.once("styledata", () => renderMarkers());
     map.current.setStyle(MAP_STYLES[theme]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme, mapLoaded]);
 
-  // Build popup HTML using CSS variables — adapts automatically to active theme
+  // ── Popup HTML (CSS variables auto-adapt to theme) ────────────────────────
   function buildPopupHTML(resource: Resource, catColor: string, catLabel: string): string {
     return `<div style="background:var(--popup-bg);border:1px solid var(--popup-border);border-radius:8px;padding:10px;font-family:'IBM Plex Mono',monospace;min-width:200px;">
       <div style="font-size:8px;color:${catColor};letter-spacing:0.1em;margin-bottom:4px;text-transform:uppercase">${catLabel}</div>
@@ -98,7 +150,7 @@ export function MapView({
     </div>`;
   }
 
-  // Render resource markers
+  // ── Render resource markers ───────────────────────────────────────────────
   const renderMarkers = useCallback(() => {
     if (!map.current || !mapLoaded) return;
 
@@ -125,10 +177,12 @@ export function MapView({
         box-shadow: 0 0 ${resource.urgent ? 16 : 10}px ${resource.urgent ? "#ef444466" : cat.color + "66"};
         cursor: pointer;
         transition: transform 0.15s;
+        z-index: 1;
       `;
       el.onmouseenter = () => { el.style.transform = "scale(1.4)"; };
       el.onmouseleave = () => { el.style.transform = "scale(1)"; };
-      el.onclick = () => onSelectState(resource.state);
+      // Clicking a marker selects its state (and stops propagation to the map)
+      el.onclick = (e) => { e.stopPropagation(); onSelectState(resource.state); };
       el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") onSelectState(resource.state); };
 
       const popup = new mapboxgl.Popup({ offset: 12, closeButton: false, maxWidth: "240px" })
@@ -146,7 +200,7 @@ export function MapView({
 
   useEffect(() => { renderMarkers(); }, [renderMarkers]);
 
-  // Fly to selected state
+  // ── Fly to selected state ─────────────────────────────────────────────────
   useEffect(() => {
     if (!map.current || !mapLoaded || !selectedState) return;
     const coords = STATE_CENTROIDS[selectedState];
@@ -180,6 +234,24 @@ export function MapView({
           {resources.length} ACTIVE CENTERS
         </div>
       </div>
+
+      {/* Click-to-select hint — only shown before first state selection */}
+      {!selectedState && mapLoaded && (
+        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+          <div className="font-mono text-[10px] text-content-secondary bg-surface-0/80 border border-border px-3 py-1.5 rounded-full backdrop-blur-sm tracking-[0.08em] whitespace-nowrap">
+            {clicking ? "LOCATING…" : "CLICK ANY STATE TO LOAD RESOURCES"}
+          </div>
+        </div>
+      )}
+
+      {/* Loading indicator during reverse geocode */}
+      {clicking && (
+        <div className="absolute inset-0 z-20 pointer-events-none flex items-center justify-center">
+          <div className="font-mono text-[11px] text-content-primary bg-surface-0/90 border border-border px-4 py-2 rounded-lg backdrop-blur-sm tracking-[0.1em] animate-pulse">
+            LOCATING STATE…
+          </div>
+        </div>
+      )}
 
       {/* Mobile toggle buttons */}
       <div className="md:hidden absolute top-4 right-4 z-10 flex flex-col gap-2">
