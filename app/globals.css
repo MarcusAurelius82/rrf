@@ -112,6 +112,9 @@ body.drawer-open { overflow: hidden; }
 
 /* ── Mapbox overrides ─────────────────────────────────────────────────────── */
 
+/* Prevent default Mapbox pin SVG from rendering on custom marker elements */
+.mapboxgl-marker > svg { display: none !important; }
+
 .mapboxgl-popup-content {
   background:    transparent !important;
   padding:       0 !important;

@@ -179,7 +179,7 @@ export function MapView({
       const popup = new mapboxgl.Popup({ offset: 12, closeButton: false, maxWidth: "240px" })
         .setHTML(buildPopupHTML(resource, cat.color, cat.label));
 
-      const marker = new mapboxgl.Marker(el)
+      const marker = new mapboxgl.Marker({ element: el })
         .setLngLat([resource.lng, resource.lat])
         .setPopup(popup)
         .addTo(map.current!);
