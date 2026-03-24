@@ -12,9 +12,11 @@ interface MapViewProps {
   selectedState: string | null;
   onSelectState: (state: string) => void;
   activeCategory: ResourceCategory | null;
+  onMobileSidebarToggle?: () => void;
+  onMobilePanelToggle?: () => void;
 }
 
-// State centroids for label markers
+// State centroids for fly-to
 const STATE_CENTROIDS: Record<string, [number, number]> = {
   AL:[-86.8,32.8],AK:[-153,64],AZ:[-111.1,34.3],AR:[-92.4,34.9],CA:[-119.7,37.2],
   CO:[-105.5,39.0],CT:[-72.7,41.6],DE:[-75.5,39.0],FL:[-81.5,27.9],GA:[-83.4,32.7],
@@ -28,11 +30,19 @@ const STATE_CENTROIDS: Record<string, [number, number]> = {
   VA:[-78.5,37.5],WA:[-120.5,47.5],WV:[-80.6,38.6],WI:[-89.8,44.2],WY:[-107.6,43.0],
 };
 
-export function MapView({ resources, selectedState, onSelectState, activeCategory }: MapViewProps) {
+export function MapView({
+  resources,
+  selectedState,
+  onSelectState,
+  activeCategory,
+  onMobileSidebarToggle,
+  onMobilePanelToggle,
+}: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 37.09, lng: -95.71 });
 
   // Init map
   useEffect(() => {
@@ -44,29 +54,40 @@ export function MapView({ resources, selectedState, onSelectState, activeCategor
       center: [-95.7, 37.1],
       zoom: 3.8,
       minZoom: 2,
-      maxZoom: 12,
+      maxZoom: 14,
     });
 
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
+
     map.current.on("load", () => setMapLoaded(true));
+
+    map.current.on("moveend", () => {
+      if (!map.current) return;
+      const c = map.current.getCenter();
+      setMapCenter({ lat: c.lat, lng: c.lng });
+    });
 
     return () => { map.current?.remove(); map.current = null; };
   }, []);
 
-  // Add resource markers
+  // Render resource markers
   const renderMarkers = useCallback(() => {
     if (!map.current || !mapLoaded) return;
 
-    // Clear existing
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
-    const filtered = activeCategory ? resources.filter(r => r.category === activeCategory) : resources;
+    const filtered = activeCategory
+      ? resources.filter(r => r.category === activeCategory)
+      : resources;
 
     filtered.forEach(resource => {
       const cat = CATEGORY_CONFIG[resource.category];
 
       const el = document.createElement("div");
+      el.setAttribute("role", "button");
+      el.setAttribute("aria-label", `${resource.name} — ${cat.label}`);
+      el.setAttribute("tabindex", "0");
       el.style.cssText = `
         width: ${resource.urgent ? 18 : 14}px;
         height: ${resource.urgent ? 18 : 14}px;
@@ -77,9 +98,10 @@ export function MapView({ resources, selectedState, onSelectState, activeCategor
         cursor: pointer;
         transition: transform 0.15s;
       `;
-      el.onmouseenter = () => el.style.transform = "scale(1.4)";
-      el.onmouseleave = () => el.style.transform = "scale(1)";
+      el.onmouseenter = () => { el.style.transform = "scale(1.4)"; };
+      el.onmouseleave = () => { el.style.transform = "scale(1)"; };
       el.onclick = () => onSelectState(resource.state);
+      el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") onSelectState(resource.state); };
 
       const popup = new mapboxgl.Popup({ offset: 12, closeButton: false, maxWidth: "220px" })
         .setHTML(`
@@ -88,6 +110,7 @@ export function MapView({ resources, selectedState, onSelectState, activeCategor
             <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:6px">${resource.name}</div>
             <div style="font-size:10px;color:#888">${resource.address}</div>
             ${resource.phone ? `<div style="font-size:10px;color:#888;margin-top:3px">${resource.phone}</div>` : ""}
+            ${resource.urgent ? `<div style="font-size:8px;color:#ef4444;margin-top:5px;letter-spacing:0.1em;font-weight:700">⚠ URGENT</div>` : ""}
           </div>
         `);
 
@@ -110,29 +133,67 @@ export function MapView({ resources, selectedState, onSelectState, activeCategor
     map.current.flyTo({ center: coords, zoom: 6.5, duration: 1200, essential: true });
   }, [selectedState, mapLoaded]);
 
+  const latStr = `${Math.abs(mapCenter.lat).toFixed(2)}°${mapCenter.lat >= 0 ? "N" : "S"}`;
+  const lngStr = `${Math.abs(mapCenter.lng).toFixed(2)}°${mapCenter.lng >= 0 ? "E" : "W"}`;
+
   return (
-    <div className="relative flex-1 overflow-hidden">
+    <div className="relative flex-1 overflow-hidden" role="region" aria-label="Interactive resource map">
       {/* Map header overlay */}
       <div className="absolute top-4 left-4 z-10 pointer-events-none">
-        <div className="font-mono text-[9px] text-[#444] tracking-[0.12em] mb-1">ACTIVE SECTOR</div>
-        <div className="font-mono text-[20px] font-bold tracking-[0.04em] text-white border border-white/15 px-3.5 py-2 rounded-md bg-black/80 backdrop-blur-sm">
+        <div className="font-mono text-[9px] text-[#444] tracking-[0.12em] mb-1" aria-hidden="true">
+          ACTIVE SECTOR
+        </div>
+        <div
+          className="font-mono text-[20px] font-bold tracking-[0.04em] text-white border border-white/15 px-3.5 py-2 rounded-md bg-black/80 backdrop-blur-sm"
+          aria-live="polite"
+          aria-label={`Viewing: ${selectedState ? `State ${selectedState}` : "National overview"}`}
+        >
           {selectedState ? `STATE — ${selectedState}` : "USA_NATIONAL"}
         </div>
-        <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold text-white mt-2 px-2.5 py-1.5 rounded-full bg-[#2563eb]/15 border border-[#2563eb]/30 w-fit">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#2563eb] shadow-[0_0_6px_#2563eb] animate-pulse" />
+        <div
+          className="flex items-center gap-1.5 font-mono text-[10px] font-semibold text-white mt-2 px-2.5 py-1.5 rounded-full bg-[#2563eb]/15 border border-[#2563eb]/30 w-fit"
+          aria-live="polite"
+          aria-label={`${resources.length} active resource centers`}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-[#2563eb] shadow-[0_0_6px_#2563eb] animate-pulse" aria-hidden="true" />
           {resources.length} ACTIVE CENTERS
         </div>
       </div>
 
+      {/* Mobile toggle buttons */}
+      <div className="md:hidden absolute top-4 right-4 z-10 flex flex-col gap-2">
+        {onMobileSidebarToggle && (
+          <button
+            onClick={onMobileSidebarToggle}
+            aria-label="Open filters"
+            className="w-10 h-10 flex items-center justify-center rounded-lg bg-black/80 border border-white/15 backdrop-blur-sm text-white text-[13px] hover:bg-[#1a1a1a] transition-all"
+          >
+            ☰
+          </button>
+        )}
+        {onMobilePanelToggle && (
+          <button
+            onClick={onMobilePanelToggle}
+            aria-label="Open resource list"
+            className="w-10 h-10 flex items-center justify-center rounded-lg bg-black/80 border border-white/15 backdrop-blur-sm font-mono text-[9px] font-bold text-white hover:bg-[#1a1a1a] transition-all leading-none"
+          >
+            LIST
+          </button>
+        )}
+      </div>
+
       {/* Map container */}
-      <div ref={mapContainer} className="w-full h-full" />
+      <div ref={mapContainer} className="w-full h-full" aria-hidden="true" />
 
       {/* Status bar */}
-      <div className="absolute bottom-0 left-0 right-0 h-9 flex items-center gap-6 px-4 border-t border-white/[0.08] bg-black/90 backdrop-blur-sm font-mono text-[10px] text-[#444] tracking-[0.08em]">
-        <span>LAT <span className="text-[#888]">37.09°N</span></span>
-        <span>LON <span className="text-[#888]">95.71°W</span></span>
-        {selectedState && <span>SELECTED <span className="text-[#888]">{selectedState}</span></span>}
-        <span>STATUS <span className="text-[#2563eb]">OPTIMIZED</span></span>
+      <div
+        className="absolute bottom-0 left-0 right-0 h-9 flex items-center gap-4 md:gap-6 px-3 md:px-4 border-t border-white/[0.08] bg-black/90 backdrop-blur-sm font-mono text-[10px] text-[#444] tracking-[0.08em]"
+        aria-hidden="true"
+      >
+        <span>LAT <span className="text-[#888]">{latStr}</span></span>
+        <span>LON <span className="text-[#888]">{lngStr}</span></span>
+        {selectedState && <span className="hidden sm:inline">SELECTED <span className="text-[#888]">{selectedState}</span></span>}
+        <span className="ml-auto">STATUS <span className="text-[#2563eb]">LIVE</span></span>
       </div>
     </div>
   );
