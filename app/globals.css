@@ -2,9 +2,84 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  box-sizing: border-box;
+/* ── Theme tokens ─────────────────────────────────────────────────────────────
+   All color decisions flow through CSS variables.
+   Tailwind semantic classes (bg-surface-1, text-content-secondary…) resolve
+   to whichever variable set is active on <html data-theme="dark|light">.
+─────────────────────────────────────────────────────────────────────────────── */
+
+:root,
+html[data-theme="dark"] {
+  --surface-0:  #0a0a0a;
+  --surface-1:  #111111;
+  --surface-2:  #1a1a1a;
+  --surface-3:  #222222;
+
+  --text-primary:   #ffffff;
+  --text-secondary: #888888;
+  --text-tertiary:  #555555;
+  --text-muted:     #444444;
+  --text-faint:     #333333;
+
+  --border-subtle:  rgba(255,255,255,0.06);
+  --border-default: rgba(255,255,255,0.08);
+  --border-active:  rgba(255,255,255,0.15);
+  --border-strong:  rgba(255,255,255,0.22);
+
+  --scrollbar-track:       #111111;
+  --scrollbar-thumb:       #333333;
+  --scrollbar-thumb-hover: #555555;
+
+  --popup-bg:     #1a1a1a;
+  --popup-border: rgba(255,255,255,0.10);
+  --popup-text:   #ffffff;
+  --popup-sub:    #888888;
+
+  --ctrl-bg:        #111111;
+  --ctrl-btn-color: #888888;
+  --ctrl-btn-hover: #1a1a1a;
+
+  --select-bg:   #1a1a1a;
+  --select-text: #ffffff;
 }
+
+html[data-theme="light"] {
+  --surface-0:  #f5f5f5;
+  --surface-1:  #ffffff;
+  --surface-2:  #ebebeb;
+  --surface-3:  #e0e0e0;
+
+  --text-primary:   #0a0a0a;
+  --text-secondary: #555555;
+  --text-tertiary:  #888888;
+  --text-muted:     #aaaaaa;
+  --text-faint:     #cccccc;
+
+  --border-subtle:  rgba(0,0,0,0.05);
+  --border-default: rgba(0,0,0,0.09);
+  --border-active:  rgba(0,0,0,0.16);
+  --border-strong:  rgba(0,0,0,0.22);
+
+  --scrollbar-track:       #ebebeb;
+  --scrollbar-thumb:       #cccccc;
+  --scrollbar-thumb-hover: #aaaaaa;
+
+  --popup-bg:     #ffffff;
+  --popup-border: rgba(0,0,0,0.10);
+  --popup-text:   #0a0a0a;
+  --popup-sub:    #555555;
+
+  --ctrl-bg:        #ffffff;
+  --ctrl-btn-color: #555555;
+  --ctrl-btn-hover: #f0f0f0;
+
+  --select-bg:   #ffffff;
+  --select-text: #0a0a0a;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+
+* { box-sizing: border-box; }
 
 html, body {
   margin: 0;
@@ -12,58 +87,54 @@ html, body {
   height: 100%;
 }
 
-/* Focus ring — keyboard-only visible ring */
+/* Keyboard-only focus ring */
 :focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
   border-radius: 4px;
 }
+:focus:not(:focus-visible) { outline: none; }
 
-/* Remove focus ring for mouse/touch users */
-:focus:not(:focus-visible) {
-  outline: none;
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+
+/* Select */
+select option {
+  background: var(--select-bg);
+  color:      var(--select-text);
 }
 
-/* Mapbox popup overrides */
+/* Mobile: prevent body scroll when a drawer is open */
+body.drawer-open { overflow: hidden; }
+
+/* ── Mapbox overrides ─────────────────────────────────────────────────────── */
+
 .mapboxgl-popup-content {
-  background: transparent !important;
-  padding: 0 !important;
-  box-shadow: none !important;
+  background:    transparent !important;
+  padding:       0 !important;
+  box-shadow:    none !important;
   border-radius: 8px !important;
 }
 
-.mapboxgl-popup-tip {
-  display: none !important;
-}
+.mapboxgl-popup-tip { display: none !important; }
 
-/* Mapbox nav control */
 .mapboxgl-ctrl-group {
-  background: #111 !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
+  background: var(--ctrl-bg) !important;
+  border: 1px solid var(--border-default) !important;
 }
 
 .mapboxgl-ctrl-group button {
   background-color: transparent !important;
-  color: #888 !important;
+  color: var(--ctrl-btn-color) !important;
 }
 
 .mapboxgl-ctrl-group button:hover {
-  background-color: #1a1a1a !important;
+  background-color: var(--ctrl-btn-hover) !important;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: #111; }
-::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: #555; }
-
-/* Select element dark styles */
-select option {
-  background: #1a1a1a;
-  color: #fff;
-}
-
-/* Mobile: prevent body scroll when drawer is open */
-body.drawer-open {
-  overflow: hidden;
+html[data-theme="light"] .mapboxgl-ctrl-attrib-inner a {
+  color: #555 !important;
 }

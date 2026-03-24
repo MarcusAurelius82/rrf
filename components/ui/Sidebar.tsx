@@ -20,17 +20,17 @@ export function Sidebar({
 }: SidebarProps) {
   return (
     <aside
-      className="w-[220px] flex-shrink-0 border-r border-white/[0.08] bg-[#0a0a0a] flex flex-col py-4 overflow-y-auto h-full"
+      className="w-[220px] flex-shrink-0 border-r border-border bg-surface-0 flex flex-col py-4 overflow-y-auto h-full"
       aria-label="Resource category filters"
     >
       {/* Mobile header */}
       {onClose && (
-        <div className="flex items-center justify-between px-3.5 pb-3 mb-1 border-b border-white/[0.06] md:hidden">
-          <span className="font-mono text-[11px] font-semibold text-[#888] tracking-[0.08em]">FILTERS</span>
+        <div className="flex items-center justify-between px-3.5 pb-3 mb-1 border-b border-border-subtle md:hidden">
+          <span className="font-mono text-[11px] font-semibold text-content-secondary tracking-[0.08em]">FILTERS</span>
           <button
             onClick={onClose}
             aria-label="Close filters"
-            className="w-7 h-7 flex items-center justify-center rounded-md text-[#555] hover:text-white hover:bg-white/[0.08] transition-all text-[12px]"
+            className="w-7 h-7 flex items-center justify-center rounded-md text-content-tertiary hover:text-content-primary hover:bg-border transition-all text-[12px]"
           >
             ✕
           </button>
@@ -38,10 +38,10 @@ export function Sidebar({
       )}
 
       <div className="px-3.5 pb-4">
-        <div className="font-mono text-[9px] font-semibold text-[#444] tracking-[0.12em] mb-1" aria-hidden="true">
+        <div className="font-mono text-[9px] font-semibold text-content-muted tracking-[0.12em] mb-1" aria-hidden="true">
           RESOURCES
         </div>
-        <div className="font-mono text-[11px] font-semibold text-[#666] tracking-[0.06em] mb-3" aria-hidden="true">
+        <div className="font-mono text-[11px] font-semibold text-content-tertiary tracking-[0.06em] mb-3" aria-hidden="true">
           FILTER_BY_TYPE
         </div>
 
@@ -59,8 +59,8 @@ export function Sidebar({
                 className={cn(
                   "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md mb-0.5 border transition-all",
                   isActive
-                    ? "bg-[#1a1a1a] border-white/10"
-                    : "bg-transparent border-transparent hover:bg-[#111]"
+                    ? "bg-surface-2 border-border"
+                    : "bg-transparent border-transparent hover:bg-surface-1"
                 )}
               >
                 <div
@@ -72,12 +72,12 @@ export function Sidebar({
                 </div>
                 <span
                   className="font-mono text-[10px] font-semibold tracking-[0.08em] flex-1 text-left"
-                  style={{ color: isActive ? color : "#888" }}
+                  style={{ color: isActive ? color : "var(--text-secondary)" }}
                 >
                   {label}
                 </span>
                 <span
-                  className="font-mono text-[9px] text-[#555] bg-[#111] px-1.5 py-0.5 rounded-full border border-white/[0.06]"
+                  className="font-mono text-[9px] text-content-tertiary bg-surface-1 px-1.5 py-0.5 rounded-full border border-border-subtle"
                   aria-hidden="true"
                 >
                   {count}
@@ -88,12 +88,12 @@ export function Sidebar({
         </div>
       </div>
 
-      <div className="h-px bg-white/[0.06] mx-3.5 my-1" role="separator" />
+      <div className="h-px bg-border-subtle mx-3.5 my-1" role="separator" />
 
       <div className="px-3.5 mt-3">
         <button
           onClick={onReportMissing}
-          className="w-full text-left font-mono text-[10px] font-medium text-[#666] px-2.5 py-2 rounded-md border border-white/[0.08] hover:border-white/15 hover:text-white hover:bg-[#1a1a1a] transition-all"
+          className="w-full text-left font-mono text-[10px] font-medium text-content-tertiary px-2.5 py-2 rounded-md border border-border hover:border-border-active hover:text-content-primary hover:bg-surface-2 transition-all"
           aria-label="Report a missing resource"
         >
           + Report Missing Resource
@@ -104,13 +104,13 @@ export function Sidebar({
         <nav aria-label="Support links">
           <a
             href="mailto:support@refugee-node.org"
-            className="flex w-full text-left font-mono text-[10px] text-[#444] px-1 py-1.5 hover:text-[#888] transition-colors tracking-[0.06em]"
+            className="flex w-full text-left font-mono text-[10px] text-content-muted px-1 py-1.5 hover:text-content-secondary transition-colors tracking-[0.06em]"
           >
             ⊙  SUPPORT
           </a>
           <a
             href="/faq"
-            className="flex w-full text-left font-mono text-[10px] text-[#444] px-1 py-1.5 hover:text-[#888] transition-colors tracking-[0.06em]"
+            className="flex w-full text-left font-mono text-[10px] text-content-muted px-1 py-1.5 hover:text-content-secondary transition-colors tracking-[0.06em]"
           >
             ?  FAQ
           </a>

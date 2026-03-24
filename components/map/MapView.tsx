@@ -4,8 +4,14 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { Resource, ResourceCategory } from "@/types";
 import { CATEGORY_CONFIG } from "@/lib/utils";
+import { useTheme } from "@/lib/theme";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
+
+const MAP_STYLES: Record<"dark" | "light", string> = {
+  dark:  "mapbox://styles/mapbox/dark-v11",
+  light: "mapbox://styles/mapbox/light-v11",
+};
 
 interface MapViewProps {
   resources: Resource[];
@@ -38,6 +44,7 @@ export function MapView({
   onMobileSidebarToggle,
   onMobilePanelToggle,
 }: MapViewProps) {
+  const { theme } = useTheme();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
@@ -50,17 +57,15 @@ export function MapView({
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: "mapbox://styles/mapbox/dark-v11",
-      center: [-95.7, 37.1],
-      zoom: 3.8,
-      minZoom: 2,
-      maxZoom: 14,
+      style:     MAP_STYLES[theme],
+      center:    [-95.7, 37.1],
+      zoom:      3.8,
+      minZoom:   2,
+      maxZoom:   14,
     });
 
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
-
     map.current.on("load", () => setMapLoaded(true));
-
     map.current.on("moveend", () => {
       if (!map.current) return;
       const c = map.current.getCenter();
@@ -68,7 +73,30 @@ export function MapView({
     });
 
     return () => { map.current?.remove(); map.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Switch map style on theme change (after initial load)
+  const themeRef = useRef(theme);
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    if (themeRef.current === theme) return; // skip identical
+    themeRef.current = theme;
+    map.current.once("styledata", () => renderMarkers());
+    map.current.setStyle(MAP_STYLES[theme]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme, mapLoaded]);
+
+  // Build popup HTML using CSS variables — adapts automatically to active theme
+  function buildPopupHTML(resource: Resource, catColor: string, catLabel: string): string {
+    return `<div style="background:var(--popup-bg);border:1px solid var(--popup-border);border-radius:8px;padding:10px;font-family:'IBM Plex Mono',monospace;min-width:200px;">
+      <div style="font-size:8px;color:${catColor};letter-spacing:0.1em;margin-bottom:4px;text-transform:uppercase">${catLabel}</div>
+      <div style="font-size:12px;font-weight:700;color:var(--popup-text);margin-bottom:6px;line-height:1.3">${resource.name}</div>
+      <div style="font-size:10px;color:var(--popup-sub)">${resource.address}</div>
+      ${resource.phone ? `<div style="font-size:10px;color:var(--popup-sub);margin-top:3px">${resource.phone}</div>` : ""}
+      ${resource.urgent ? `<div style="font-size:8px;color:#ef4444;margin-top:5px;letter-spacing:0.1em;font-weight:700">⚠ URGENT</div>` : ""}
+    </div>`;
+  }
 
   // Render resource markers
   const renderMarkers = useCallback(() => {
@@ -103,16 +131,8 @@ export function MapView({
       el.onclick = () => onSelectState(resource.state);
       el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") onSelectState(resource.state); };
 
-      const popup = new mapboxgl.Popup({ offset: 12, closeButton: false, maxWidth: "220px" })
-        .setHTML(`
-          <div style="background:#1a1a1a;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px;font-family:'IBM Plex Mono',monospace;">
-            <div style="font-size:8px;color:${cat.color};letter-spacing:0.1em;margin-bottom:4px">${cat.label}</div>
-            <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:6px">${resource.name}</div>
-            <div style="font-size:10px;color:#888">${resource.address}</div>
-            ${resource.phone ? `<div style="font-size:10px;color:#888;margin-top:3px">${resource.phone}</div>` : ""}
-            ${resource.urgent ? `<div style="font-size:8px;color:#ef4444;margin-top:5px;letter-spacing:0.1em;font-weight:700">⚠ URGENT</div>` : ""}
-          </div>
-        `);
+      const popup = new mapboxgl.Popup({ offset: 12, closeButton: false, maxWidth: "240px" })
+        .setHTML(buildPopupHTML(resource, cat.color, cat.label));
 
       const marker = new mapboxgl.Marker(el)
         .setLngLat([resource.lng, resource.lat])
@@ -121,6 +141,7 @@ export function MapView({
 
       markersRef.current.push(marker);
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resources, activeCategory, mapLoaded, onSelectState]);
 
   useEffect(() => { renderMarkers(); }, [renderMarkers]);
@@ -140,22 +161,22 @@ export function MapView({
     <div className="relative flex-1 overflow-hidden" role="region" aria-label="Interactive resource map">
       {/* Map header overlay */}
       <div className="absolute top-4 left-4 z-10 pointer-events-none">
-        <div className="font-mono text-[9px] text-[#444] tracking-[0.12em] mb-1" aria-hidden="true">
+        <div className="font-mono text-[9px] text-content-muted tracking-[0.12em] mb-1" aria-hidden="true">
           ACTIVE SECTOR
         </div>
         <div
-          className="font-mono text-[20px] font-bold tracking-[0.04em] text-white border border-white/15 px-3.5 py-2 rounded-md bg-black/80 backdrop-blur-sm"
+          className="font-mono text-[20px] font-bold tracking-[0.04em] text-content-primary border border-border-active px-3.5 py-2 rounded-md bg-surface-0/80 backdrop-blur-sm"
           aria-live="polite"
           aria-label={`Viewing: ${selectedState ? `State ${selectedState}` : "National overview"}`}
         >
           {selectedState ? `STATE — ${selectedState}` : "USA_NATIONAL"}
         </div>
         <div
-          className="flex items-center gap-1.5 font-mono text-[10px] font-semibold text-white mt-2 px-2.5 py-1.5 rounded-full bg-[#2563eb]/15 border border-[#2563eb]/30 w-fit"
+          className="flex items-center gap-1.5 font-mono text-[10px] font-semibold text-content-primary mt-2 px-2.5 py-1.5 rounded-full bg-accent-dim border border-accent-border w-fit"
           aria-live="polite"
           aria-label={`${resources.length} active resource centers`}
         >
-          <span className="w-1.5 h-1.5 rounded-full bg-[#2563eb] shadow-[0_0_6px_#2563eb] animate-pulse" aria-hidden="true" />
+          <span className="w-1.5 h-1.5 rounded-full bg-accent shadow-[0_0_6px_#2563eb] animate-pulse" aria-hidden="true" />
           {resources.length} ACTIVE CENTERS
         </div>
       </div>
@@ -166,7 +187,7 @@ export function MapView({
           <button
             onClick={onMobileSidebarToggle}
             aria-label="Open filters"
-            className="w-10 h-10 flex items-center justify-center rounded-lg bg-black/80 border border-white/15 backdrop-blur-sm text-white text-[13px] hover:bg-[#1a1a1a] transition-all"
+            className="w-10 h-10 flex items-center justify-center rounded-lg bg-surface-0/80 border border-border-active backdrop-blur-sm text-content-primary text-[13px] hover:bg-surface-2 transition-all"
           >
             ☰
           </button>
@@ -175,7 +196,7 @@ export function MapView({
           <button
             onClick={onMobilePanelToggle}
             aria-label="Open resource list"
-            className="w-10 h-10 flex items-center justify-center rounded-lg bg-black/80 border border-white/15 backdrop-blur-sm font-mono text-[9px] font-bold text-white hover:bg-[#1a1a1a] transition-all leading-none"
+            className="w-10 h-10 flex items-center justify-center rounded-lg bg-surface-0/80 border border-border-active backdrop-blur-sm font-mono text-[9px] font-bold text-content-primary hover:bg-surface-2 transition-all leading-none"
           >
             LIST
           </button>
@@ -187,13 +208,13 @@ export function MapView({
 
       {/* Status bar */}
       <div
-        className="absolute bottom-0 left-0 right-0 h-9 flex items-center gap-4 md:gap-6 px-3 md:px-4 border-t border-white/[0.08] bg-black/90 backdrop-blur-sm font-mono text-[10px] text-[#444] tracking-[0.08em]"
+        className="absolute bottom-0 left-0 right-0 h-9 flex items-center gap-4 md:gap-6 px-3 md:px-4 border-t border-border bg-surface-0/90 backdrop-blur-sm font-mono text-[10px] text-content-muted tracking-[0.08em]"
         aria-hidden="true"
       >
-        <span>LAT <span className="text-[#888]">{latStr}</span></span>
-        <span>LON <span className="text-[#888]">{lngStr}</span></span>
-        {selectedState && <span className="hidden sm:inline">SELECTED <span className="text-[#888]">{selectedState}</span></span>}
-        <span className="ml-auto">STATUS <span className="text-[#2563eb]">LIVE</span></span>
+        <span>LAT <span className="text-content-secondary">{latStr}</span></span>
+        <span>LON <span className="text-content-secondary">{lngStr}</span></span>
+        {selectedState && <span className="hidden sm:inline">SELECTED <span className="text-content-secondary">{selectedState}</span></span>}
+        <span className="ml-auto">STATUS <span className="text-accent">LIVE</span></span>
       </div>
     </div>
   );

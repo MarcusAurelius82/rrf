@@ -13,30 +13,34 @@ const config: Config = {
         sans: ["var(--font-sans)", "IBM Plex Sans", "sans-serif"],
       },
       colors: {
+        // Surface backgrounds — resolved from CSS variables, auto-switch on theme change
         surface: {
-          0: "#0a0a0a",
-          1: "#111111",
-          2: "#1a1a1a",
-          3: "#222222",
+          0: "var(--surface-0)",
+          1: "var(--surface-1)",
+          2: "var(--surface-2)",
+          3: "var(--surface-3)",
         },
+        // Accent — blue, theme-invariant
         accent: {
           DEFAULT: "#2563eb",
-          hover: "#1d4ed8",
-          dim: "rgba(37,99,235,0.15)",
-          border: "rgba(37,99,235,0.30)",
+          hover:   "#1d4ed8",
+          dim:     "rgba(37,99,235,0.15)",
+          border:  "rgba(37,99,235,0.30)",
         },
+        // Text hierarchy
         content: {
-          primary: "#ffffff",
-          secondary: "#888888",
-          tertiary: "#555555",
-          muted: "#444444",
-          faint: "#333333",
+          primary:   "var(--text-primary)",
+          secondary: "var(--text-secondary)",
+          tertiary:  "var(--text-tertiary)",
+          muted:     "var(--text-muted)",
+          faint:     "var(--text-faint)",
         },
+        // Border opacity tokens (full RGBA baked in per theme)
         border: {
-          subtle: "rgba(255,255,255,0.06)",
-          DEFAULT: "rgba(255,255,255,0.08)",
-          active: "rgba(255,255,255,0.15)",
-          strong: "rgba(255,255,255,0.20)",
+          subtle:  "var(--border-subtle)",
+          DEFAULT: "var(--border-default)",
+          active:  "var(--border-active)",
+          strong:  "var(--border-strong)",
         },
       },
       fontSize: {

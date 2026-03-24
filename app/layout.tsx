@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import { ThemeProvider } from "@/lib/theme";
 import "./globals.css";
 
 const ibmPlexMono = IBM_Plex_Mono({
@@ -46,9 +47,12 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider>
-      <html lang="en" className={`${ibmPlexMono.variable} ${ibmPlexSans.variable}`}>
-        <body className="bg-[#0a0a0a] text-white antialiased">
-          {children}
+      {/* suppressHydrationWarning prevents mismatch when ThemeProvider sets data-theme on mount */}
+      <html lang="en" suppressHydrationWarning className={`${ibmPlexMono.variable} ${ibmPlexSans.variable}`}>
+        <body className="bg-surface-0 text-content-primary antialiased">
+          <ThemeProvider>
+            {children}
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>
