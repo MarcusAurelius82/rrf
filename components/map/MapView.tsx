@@ -173,9 +173,9 @@ export function MapView({
       el.setAttribute("role", "button");
       el.setAttribute("aria-label", `${resource.name} — ${cat.label}`);
       el.setAttribute("tabindex", "0");
-      el.style.transition = "transform 0.15s";
-      el.onmouseenter = () => { el.style.transform = "translate(-50%, -50%) scale(1.4)"; };
-      el.onmouseleave = () => { el.style.transform = "translate(-50%, -50%) scale(1)"; };
+      const pinInner = el.firstElementChild as HTMLElement;
+      el.onmouseenter = () => { pinInner.style.transform = "scale(1.4)"; };
+      el.onmouseleave = () => { pinInner.style.transform = "scale(1)"; };
       el.onclick = (e) => { e.stopPropagation(); onSelectState(resource.state); };
       el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") onSelectState(resource.state); };
 
@@ -224,9 +224,11 @@ export function MapView({
       el.setAttribute("role", "button");
       el.setAttribute("aria-label", `${stateCode}: ${info.count} resources`);
       el.setAttribute("tabindex", "0");
-      el.style.transition = "transform 0.15s";
-      el.onmouseenter = () => { el.style.transform = "translate(-50%, -50%) scale(1.2)"; };
-      el.onmouseleave = () => { el.style.transform = "translate(-50%, -50%) scale(1)"; };
+      // Inner element receives hover transforms — el is never transformed
+      const clusterInner = document.createElement("div");
+      clusterInner.style.cssText = `position:relative;width:${size}px;height:${size}px;transition:transform 0.15s;`;
+      el.onmouseenter = () => { clusterInner.style.transform = "scale(1.2)"; };
+      el.onmouseleave = () => { clusterInner.style.transform = "scale(1)"; };
 
       const circle = document.createElement("div");
       circle.style.cssText = `
@@ -245,7 +247,7 @@ export function MapView({
       `;
       label.textContent = String(info.count);
       circle.appendChild(label);
-      el.appendChild(circle);
+      clusterInner.appendChild(circle);
 
       if (info.hasUrgent) {
         const badge = document.createElement("div");
@@ -254,8 +256,10 @@ export function MapView({
           width:8px;height:8px;border-radius:50%;
           background:#ef4444;box-shadow:0 0 4px #ef4444;
         `;
-        el.appendChild(badge);
+        clusterInner.appendChild(badge);
       }
+
+      el.appendChild(clusterInner);
 
       el.onclick = (e) => {
         e.stopPropagation();

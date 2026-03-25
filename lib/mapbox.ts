@@ -44,6 +44,15 @@ export function buildMarkerElement({
     cursor: pointer;
   `;
 
+  // Inner element receives hover transforms — wrapper (el) is never transformed
+  const inner = document.createElement("div");
+  inner.style.cssText = `
+    position: relative;
+    width: ${baseSize}px;
+    height: ${baseSize}px;
+    transition: transform 0.15s;
+  `;
+
   const base = document.createElement("div");
   base.style.cssText = `
     width: ${baseSize}px;
@@ -53,7 +62,7 @@ export function buildMarkerElement({
     border: 1.5px solid rgba(255,255,255,0.25);
     box-sizing: border-box;
   `;
-  wrapper.appendChild(base);
+  inner.appendChild(base);
 
   if (urgent) {
     const badge = document.createElement("div");
@@ -67,8 +76,9 @@ export function buildMarkerElement({
       background: #ef4444;
       box-shadow: 0 0 4px #ef4444;
     `;
-    wrapper.appendChild(badge);
+    inner.appendChild(badge);
   }
 
+  wrapper.appendChild(inner);
   return wrapper;
 }
