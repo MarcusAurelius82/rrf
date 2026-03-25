@@ -174,8 +174,8 @@ export function MapView({
       el.setAttribute("aria-label", `${resource.name} — ${cat.label}`);
       el.setAttribute("tabindex", "0");
       el.style.transition = "transform 0.15s";
-      el.onmouseenter = () => { el.style.transform = "scale(1.4)"; };
-      el.onmouseleave = () => { el.style.transform = "scale(1)"; };
+      el.onmouseenter = () => { el.style.transform = "translate(-50%, -50%) scale(1.4)"; };
+      el.onmouseleave = () => { el.style.transform = "translate(-50%, -50%) scale(1)"; };
       el.onclick = (e) => { e.stopPropagation(); onSelectState(resource.state); };
       el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") onSelectState(resource.state); };
 
@@ -225,8 +225,8 @@ export function MapView({
       el.setAttribute("aria-label", `${stateCode}: ${info.count} resources`);
       el.setAttribute("tabindex", "0");
       el.style.transition = "transform 0.15s";
-      el.onmouseenter = () => { el.style.transform = "scale(1.2)"; };
-      el.onmouseleave = () => { el.style.transform = "scale(1)"; };
+      el.onmouseenter = () => { el.style.transform = "translate(-50%, -50%) scale(1.2)"; };
+      el.onmouseleave = () => { el.style.transform = "translate(-50%, -50%) scale(1)"; };
 
       const circle = document.createElement("div");
       circle.style.cssText = `
