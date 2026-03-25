@@ -27,6 +27,9 @@ CREATE TABLE resources (
   updated_at   TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- ─── Unique constraint (required for upsert deduplication) ───────────────────
+ALTER TABLE resources ADD CONSTRAINT resources_name_zip_unique UNIQUE (name, zip);
+
 -- ─── Indexes ──────────────────────────────────────────────────────────────────
 CREATE INDEX resources_location_idx ON resources USING GIST (location);
 CREATE INDEX resources_state_idx ON resources (state);
