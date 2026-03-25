@@ -98,6 +98,11 @@ function validCoords(lat: unknown, lng: unknown): boolean {
     Math.abs(la) <= 90 && Math.abs(lo) <= 180;
 }
 
+/** Stricter check: must be within continental US / territories bounds */
+function validUSCoords(lat: number, lng: number): boolean {
+  return lat >= 24 && lat <= 49 && lng >= -125 && lng <= -66;
+}
+
 function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms));
 }
@@ -540,6 +545,65 @@ async function seedLSC(existing: Set<string>) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// FIX COORDINATES — geocode existing records with bad/missing US coordinates
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function fixCoordinates() {
+  console.log("\n═══ FIX COORDINATES: Auditing existing records ═══");
+
+  const { data: records, error } = await supabase
+    .from("resources")
+    .select("id, name, address, city, state, zip, lat, lng");
+
+  if (error) {
+    console.error("  Could not fetch records:", error.message);
+    return;
+  }
+
+  const invalid = (records ?? []).filter(
+    r => !validUSCoords(Number(r.lat), Number(r.lng))
+  );
+
+  if (!invalid.length) {
+    console.log("  All records have valid US coordinates — nothing to fix.");
+    return;
+  }
+
+  console.log(`  Found ${invalid.length} records with invalid/missing US coordinates`);
+
+  let fixed = 0;
+  const failed: string[] = [];
+
+  for (const r of invalid) {
+    let geo = await geocode(`${r.address}, ${r.city}, ${r.state} ${r.zip ?? ""}`);
+    if (!geo) {
+      geo = await geocode(`${r.city}, ${r.state}`);
+    }
+    if (!geo) {
+      failed.push(`${r.name} — ${r.address}, ${r.city}, ${r.state}`);
+      continue;
+    }
+
+    const { error: updateErr } = await supabase
+      .from("resources")
+      .update({ lat: geo.lat, lng: geo.lng })
+      .eq("id", r.id);
+
+    if (updateErr) {
+      console.error(`    Update failed for "${r.name}": ${updateErr.message}`);
+    } else {
+      fixed++;
+    }
+  }
+
+  console.log(`  Fixed: ${fixed} / ${invalid.length}`);
+  if (failed.length) {
+    console.log(`  Could not geocode (fix manually):`);
+    failed.forEach(f => console.log(`    - ${f}`));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Main
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -567,6 +631,7 @@ async function main() {
   await seedHRSA(existing);
   await seedOSMShelters(existing);
   await seedLSC(existing);
+  await fixCoordinates();
 
   // ── Summary ────────────────────────────────────────────────────────────────
   console.log("\n╔══════════════════════════════════════════════════════╗");

@@ -67,12 +67,14 @@ export function MapView({
   onMobilePanelToggle,
 }: MapViewProps) {
   const { theme } = useTheme();
-  const mapContainer  = useRef<HTMLDivElement>(null);
-  const map           = useRef<mapboxgl.Map | null>(null);
-  const markersRef    = useRef<mapboxgl.Marker[]>([]);
-  const geocodingRef  = useRef(false); // debounce reverse-geocode requests
+  const mapContainer      = useRef<HTMLDivElement>(null);
+  const map               = useRef<mapboxgl.Map | null>(null);
+  const markersRef        = useRef<mapboxgl.Marker[]>([]);
+  const stateMarkersRef   = useRef<mapboxgl.Marker[]>([]);
+  const geocodingRef      = useRef(false); // debounce reverse-geocode requests
   const [mapLoaded, setMapLoaded]   = useState(false);
   const [clicking, setClicking]     = useState(false);
+  const [mapZoom, setMapZoom]       = useState(3.8);
   const [mapCenter, setMapCenter]   = useState<{ lat: number; lng: number }>({ lat: 37.09, lng: -95.71 });
 
   // ── Init map ──────────────────────────────────────────────────────────────
@@ -103,6 +105,11 @@ export function MapView({
       setMapCenter({ lat: c.lat, lng: c.lng });
     });
 
+    map.current.on("zoom", () => {
+      if (!map.current) return;
+      setMapZoom(map.current.getZoom());
+    });
+
     // ── Click anywhere on map → reverse-geocode → select state ──────────────
     map.current.on("click", async (e) => {
       if (geocodingRef.current) return; // already processing a click
@@ -129,17 +136,6 @@ export function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Switch map style when theme changes ───────────────────────────────────
-  const themeRef = useRef(theme);
-  useEffect(() => {
-    if (!map.current || !mapLoaded) return;
-    if (themeRef.current === theme) return;
-    themeRef.current = theme;
-    map.current.once("styledata", () => renderMarkers());
-    map.current.setStyle(MAP_STYLES[theme]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [theme, mapLoaded]);
-
   // ── Popup HTML (CSS variables auto-adapt to theme) ────────────────────────
   function buildPopupHTML(resource: Resource, catColor: string, catLabel: string): string {
     return `<div style="background:var(--popup-bg);border:1px solid var(--popup-border);border-radius:8px;padding:10px;font-family:'IBM Plex Mono',monospace;min-width:200px;">
@@ -151,7 +147,7 @@ export function MapView({
     </div>`;
   }
 
-  // ── Render resource markers ───────────────────────────────────────────────
+  // ── Render individual resource pins (zoom ≥ 6) ───────────────────────────
   const renderMarkers = useCallback(() => {
     if (!map.current || !mapLoaded) return;
 
@@ -163,6 +159,7 @@ export function MapView({
       : resources;
 
     filtered.forEach(resource => {
+      if (!resource.lat || !resource.lng) return;
       const cat = CATEGORY_CONFIG[resource.category];
 
       const el = buildMarkerElement({ category: resource.category, urgent: resource.urgent });
@@ -172,7 +169,6 @@ export function MapView({
       el.style.transition = "transform 0.15s";
       el.onmouseenter = () => { el.style.transform = "scale(1.4)"; };
       el.onmouseleave = () => { el.style.transform = "scale(1)"; };
-      // Clicking a marker selects its state (and stops propagation to the map)
       el.onclick = (e) => { e.stopPropagation(); onSelectState(resource.state); };
       el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") onSelectState(resource.state); };
 
@@ -189,7 +185,120 @@ export function MapView({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resources, activeCategory, mapLoaded, onSelectState]);
 
-  useEffect(() => { renderMarkers(); }, [renderMarkers]);
+  // ── Render per-state cluster pins (zoom < 6) ──────────────────────────────
+  const renderStateMarkers = useCallback(() => {
+    if (!map.current || !mapLoaded) return;
+
+    stateMarkersRef.current.forEach(m => m.remove());
+    stateMarkersRef.current = [];
+
+    const filtered = activeCategory
+      ? resources.filter(r => r.category === activeCategory)
+      : resources;
+
+    // Aggregate per state
+    const stateInfo: Record<string, { count: number; hasUrgent: boolean }> = {};
+    for (const r of filtered) {
+      if (!stateInfo[r.state]) stateInfo[r.state] = { count: 0, hasUrgent: false };
+      stateInfo[r.state].count++;
+      if (r.urgent) stateInfo[r.state].hasUrgent = true;
+    }
+
+    for (const [stateCode, info] of Object.entries(stateInfo)) {
+      const coords = STATE_CENTROIDS[stateCode];
+      if (!coords) continue;
+
+      // Diameter: 18px min, 36px max, scales with count
+      const size = Math.min(36, Math.max(18, 18 + Math.floor(Math.log2(info.count + 1) * 5)));
+      const fontSize = size <= 22 ? 8 : size <= 28 ? 10 : 11;
+
+      const el = document.createElement("div");
+      el.style.cssText = `position:relative;width:${size}px;height:${size}px;cursor:pointer;`;
+      el.setAttribute("role", "button");
+      el.setAttribute("aria-label", `${stateCode}: ${info.count} resources`);
+      el.setAttribute("tabindex", "0");
+      el.style.transition = "transform 0.15s";
+      el.onmouseenter = () => { el.style.transform = "scale(1.2)"; };
+      el.onmouseleave = () => { el.style.transform = "scale(1)"; };
+
+      const circle = document.createElement("div");
+      circle.style.cssText = `
+        width:${size}px;height:${size}px;border-radius:50%;
+        background:#2563eb;
+        box-shadow:0 0 8px #2563eb,0 0 16px rgba(37,99,235,0.4);
+        display:flex;align-items:center;justify-content:center;
+        border:1.5px solid rgba(255,255,255,0.25);box-sizing:border-box;
+      `;
+
+      const label = document.createElement("span");
+      label.style.cssText = `
+        font-family:'IBM Plex Mono',monospace;
+        font-size:${fontSize}px;font-weight:700;color:#ffffff;
+        line-height:1;pointer-events:none;
+      `;
+      label.textContent = String(info.count);
+      circle.appendChild(label);
+      el.appendChild(circle);
+
+      if (info.hasUrgent) {
+        const badge = document.createElement("div");
+        badge.style.cssText = `
+          position:absolute;top:-3px;right:-3px;
+          width:8px;height:8px;border-radius:50%;
+          background:#ef4444;box-shadow:0 0 4px #ef4444;
+        `;
+        el.appendChild(badge);
+      }
+
+      el.onclick = (e) => {
+        e.stopPropagation();
+        onSelectState(stateCode);
+        map.current?.flyTo({ center: coords, zoom: 7, duration: 1200, essential: true });
+      };
+      el.onkeydown = (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          onSelectState(stateCode);
+          map.current?.flyTo({ center: coords, zoom: 7, duration: 1200, essential: true });
+        }
+      };
+
+      const marker = new mapboxgl.Marker({ element: el })
+        .setLngLat(coords)
+        .addTo(map.current!);
+
+      stateMarkersRef.current.push(marker);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resources, activeCategory, mapLoaded, onSelectState]);
+
+  // ── Switch map style when theme changes ───────────────────────────────────
+  const themeRef = useRef(theme);
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    if (themeRef.current === theme) return;
+    themeRef.current = theme;
+    map.current.once("styledata", () => {
+      if (!map.current) return;
+      if (map.current.getZoom() < 6) renderStateMarkers();
+      else renderMarkers();
+    });
+    map.current.setStyle(MAP_STYLES[theme]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme, mapLoaded, renderMarkers, renderStateMarkers]);
+
+  // ── Zoom-aware render: state clusters below zoom 6, individual pins above ──
+  useEffect(() => {
+    if (!mapLoaded) return;
+    if (mapZoom < 6) {
+      markersRef.current.forEach(m => m.remove());
+      markersRef.current = [];
+      renderStateMarkers();
+    } else {
+      stateMarkersRef.current.forEach(m => m.remove());
+      stateMarkersRef.current = [];
+      renderMarkers();
+    }
+  }, [mapZoom, mapLoaded, renderMarkers, renderStateMarkers]);
 
   // ── Fly to selected state ─────────────────────────────────────────────────
   useEffect(() => {
