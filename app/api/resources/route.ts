@@ -16,6 +16,11 @@ export async function GET(request: NextRequest) {
     if (category) query = query.eq("category", category);
     if (urgentOnly) query = query.eq("urgent", true);
 
+    // Exclude records with missing or out-of-US-bounds coordinates
+    query = query
+      .gte("lat", 24).lte("lat", 49)
+      .gte("lng", -125).lte("lng", -66);
+
     query = query.order("urgent", { ascending: false }).order("name");
 
     const { data, error } = await query;

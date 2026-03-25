@@ -14,6 +14,12 @@ export async function POST(request: NextRequest) {
     let dbQuery = supabase.from("resources").select("*").eq("verified", true);
     if (state) dbQuery = dbQuery.eq("state", state);
     if (category) dbQuery = dbQuery.eq("category", category as ResourceCategory);
+
+    // Exclude records with missing or out-of-US-bounds coordinates
+    dbQuery = dbQuery
+      .gte("lat", 24).lte("lat", 49)
+      .gte("lng", -125).lte("lng", -66);
+
     dbQuery = dbQuery.order("urgent", { ascending: false }).limit(100);
 
     const { data: resources, error } = await dbQuery;

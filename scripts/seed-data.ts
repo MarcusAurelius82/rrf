@@ -257,11 +257,15 @@ async function seedHRSA(existing: Set<string>) {
     // HRSA CSV uses Y=lat, X=lng (geocoding artifact coordinates)
     const latRaw = csvGet(
       row, headers,
-      "geocoding artifact address primary y coordinate"
+      "geocoding artifact address primary y coordinate",
+      "geocoding artifact address y coordinate",
+      "latitude"
     );
     const lngRaw = csvGet(
       row, headers,
-      "geocoding artifact address primary x coordinate"
+      "geocoding artifact address primary x coordinate",
+      "geocoding artifact address x coordinate",
+      "longitude"
     );
 
     if (!name || !address || !city) continue;
@@ -269,7 +273,13 @@ async function seedHRSA(existing: Set<string>) {
     let lat = Number(latRaw);
     let lng = Number(lngRaw);
 
-    if (!validCoords(lat, lng)) {
+    // For US addresses lng must be negative; if both values are positive and one
+    // looks like a longitude (>90), the columns are likely swapped — correct in place
+    if (lat > 0 && lng > 0 && Math.abs(lat) > 90 && Math.abs(lng) < 90) {
+      [lat, lng] = [lng, lat];
+    }
+
+    if (!validCoords(lat, lng) || !validUSCoords(lat, lng)) {
       const geo = await geocode(`${address}, ${city}, ${state} ${zip}`);
       if (!geo) continue;
       lat = geo.lat;

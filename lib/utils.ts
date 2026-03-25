@@ -29,6 +29,12 @@ export const STATUS_CONFIG: Record<ResourceStatus, {
   appointment_only: { label: "APPOINTMENT ONLY", color: "#888888" },
 };
 
+/** Continental US + territories coordinate bounds used by API filters and client guards */
+export const US_COORD_BOUNDS = {
+  latMin: 24, latMax: 49,
+  lngMin: -125, lngMax: -66,
+} as const;
+
 export function formatPhone(phone: string): string {
   const digits = phone.replace(/\D/g, "");
   if (digits.length === 10) {

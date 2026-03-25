@@ -20,6 +20,13 @@ const US_BOUNDS: [[number, number], [number, number]] = [
   [-60,  72],
 ];
 
+/** Returns true only if coordinates fall within US bounds (matches API filter) */
+function isValidUSCoord(lat: unknown, lng: unknown): boolean {
+  const la = Number(lat), lo = Number(lng);
+  return Number.isFinite(la) && Number.isFinite(lo) &&
+    la >= 24 && la <= 49 && lo >= -125 && lo <= -66;
+}
+
 interface MapViewProps {
   resources: Resource[];
   selectedState: string | null;
@@ -159,7 +166,7 @@ export function MapView({
       : resources;
 
     filtered.forEach(resource => {
-      if (!resource.lat || !resource.lng) return;
+      if (!isValidUSCoord(resource.lat, resource.lng)) return;
       const cat = CATEGORY_CONFIG[resource.category];
 
       const el = buildMarkerElement({ category: resource.category, urgent: resource.urgent });
