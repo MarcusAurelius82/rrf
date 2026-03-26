@@ -185,15 +185,28 @@ export function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Popup HTML (CSS variables auto-adapt to theme) ────────────────────────
-  function buildPopupHTML(resource: Resource, catColor: string, catLabel: string): string {
-    return `<div style="background:var(--popup-bg);border:1px solid var(--popup-border);border-radius:8px;padding:10px;font-family:'IBM Plex Mono',monospace;min-width:200px;">
-      <div style="font-size:8px;color:${catColor};letter-spacing:0.1em;margin-bottom:4px;text-transform:uppercase">${catLabel}</div>
-      <div style="font-size:12px;font-weight:700;color:var(--popup-text);margin-bottom:6px;line-height:1.3">${resource.name}</div>
-      <div style="font-size:10px;color:var(--popup-sub)">${resource.address}</div>
-      ${resource.phone ? `<div style="font-size:10px;color:var(--popup-sub);margin-top:3px">${resource.phone}</div>` : ""}
-      <div style="font-size:9px;color:#888;margin-top:6px;letter-spacing:0.06em">lat: ${resource.lat} · lng: ${resource.lng}</div>
-      ${resource.urgent ? `<div style="font-size:8px;color:#ef4444;margin-top:5px;letter-spacing:0.1em;font-weight:700">⚠ URGENT</div>` : ""}
+  // ── Popup HTML — single or grouped resources at one address ─────────────
+  function buildGroupPopupHTML(group: Resource[]): string {
+    const primary = group[0];
+    const multi = group.length > 1;
+    const hasUrgent = group.some(r => r.urgent);
+
+    const serviceRows = group.map(r => {
+      const cat = CATEGORY_CONFIG[r.category];
+      return `<div style="display:flex;align-items:baseline;gap:6px;padding:4px 0;border-bottom:1px solid var(--popup-border);">
+        <span style="font-size:7px;color:${cat.color};letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap">${cat.label}</span>
+        <span style="font-size:11px;font-weight:600;color:var(--popup-text);line-height:1.3">${r.name}</span>
+        ${r.urgent ? `<span style="font-size:7px;color:#ef4444;font-weight:700;white-space:nowrap">⚠ URGENT</span>` : ""}
+      </div>`;
+    }).join("");
+
+    return `<div style="background:var(--popup-bg);border:1px solid var(--popup-border);border-radius:8px;padding:10px;font-family:'IBM Plex Mono',monospace;min-width:220px;max-width:280px;">
+      ${multi ? `<div style="font-size:8px;color:#2563eb;letter-spacing:0.1em;margin-bottom:6px;text-transform:uppercase">${group.length} SERVICES AT THIS LOCATION</div>` : ""}
+      <div style="margin-bottom:6px">${serviceRows}</div>
+      <div style="font-size:10px;color:var(--popup-sub);margin-top:6px">${primary.address}, ${primary.city}</div>
+      ${primary.phone ? `<div style="font-size:10px;color:var(--popup-sub);margin-top:2px">${primary.phone}</div>` : ""}
+      ${hasUrgent && !multi ? "" : ""}
+      <div style="font-size:9px;color:#888;margin-top:6px;letter-spacing:0.06em">lat: ${primary.lat} · lng: ${primary.lng}</div>
     </div>`;
   }
 
@@ -208,20 +221,36 @@ export function MapView({
       ? resources.filter(r => r.category === activeCategory)
       : resources;
 
-    filtered.forEach(resource => {
-      const safeCoord = getSafeResourceCoord(resource);
-      if (!safeCoord) return;
-      const cat = CATEGORY_CONFIG[resource.category];
+    // Group resources at the same address into one marker
+    const groups = new Map<string, Resource[]>();
+    for (const r of filtered) {
+      const key = `${r.address.toLowerCase().trim()}|${r.zip.trim()}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(r);
+    }
 
-      const el = buildMarkerElement({ category: resource.category, urgent: resource.urgent });
+    for (const group of groups.values()) {
+      const primary = group[0];
+      const safeCoord = getSafeResourceCoord(primary);
+      if (!safeCoord) continue;
+
+      const hasUrgent = group.some(r => r.urgent);
+      const cat = CATEGORY_CONFIG[primary.category];
+
+      const el = buildMarkerElement({ category: primary.category, urgent: hasUrgent });
       el.setAttribute("role", "button");
-      el.setAttribute("aria-label", `${resource.name} — ${cat.label}`);
+      el.setAttribute("aria-label",
+        group.length > 1
+          ? `${group.length} services at ${primary.address}`
+          : `${primary.name} — ${cat.label}`
+      );
       el.setAttribute("tabindex", "0");
       const pinInner = el.firstElementChild as HTMLElement;
       el.onmouseenter = () => { pinInner.style.transform = "scale(1.4)"; };
       el.onmouseleave = () => { pinInner.style.transform = "scale(1)"; };
-      const popup = new mapboxgl.Popup({ offset: 12, closeButton: true, maxWidth: "260px" })
-        .setHTML(buildPopupHTML(resource, cat.color, cat.label));
+
+      const popup = new mapboxgl.Popup({ offset: 12, closeButton: true, maxWidth: "300px" })
+        .setHTML(buildGroupPopupHTML(group));
 
       const marker = new mapboxgl.Marker({ element: el })
         .setLngLat(safeCoord)
@@ -232,7 +261,7 @@ export function MapView({
       el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") marker.togglePopup(); };
 
       markersRef.current.push(marker);
-    });
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resources, activeCategory, mapLoaded, onSelectState]);
 
