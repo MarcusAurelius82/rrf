@@ -228,8 +228,8 @@ export function MapView({
         .setPopup(popup)
         .addTo(map.current!);
 
-      el.onclick = (e) => { e.stopPropagation(); marker.togglePopup(); onSelectState(resource.state); };
-      el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { marker.togglePopup(); onSelectState(resource.state); } };
+      el.onclick = (e) => { e.stopPropagation(); marker.togglePopup(); };
+      el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") marker.togglePopup(); };
 
       markersRef.current.push(marker);
     });
