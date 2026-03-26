@@ -154,7 +154,7 @@ export function MapView({
       setMapCenter({ lat: c.lat, lng: c.lng });
     });
 
-    map.current.on("zoom", () => {
+    map.current.on("zoomend", () => {
       if (!map.current) return;
       setMapZoom(map.current.getZoom());
     });
