@@ -51,27 +51,22 @@ function isValidUSCoord(lat: unknown, lng: unknown, state?: string): boolean {
  * far from the state center (geocoding errors placing resources in water/wrong state).
  */
 function getSafeResourceCoord(resource: Resource): [number, number] | null {
-  // TEST BRANCH: treat resource.lat as lng and resource.lng as lat
-  // (diagnosing whether DB columns are stored swapped)
-  const lat = resource.lng; // intentionally swapped
-  const lng = resource.lat; // intentionally swapped
-
   // Invalid coords → use centroid, or drop marker if no centroid
-  if (!isValidUSCoord(lat, lng, resource.state)) {
+  if (!isValidUSCoord(resource.lat, resource.lng, resource.state)) {
     return STATE_CENTROIDS[resource.state] ?? null;
   }
 
   // No centroid to sanity-check against → trust raw coords
   const centroid = STATE_CENTROIDS[resource.state];
-  if (!centroid) return [lng, lat];
+  if (!centroid) return [resource.lng, resource.lat];
 
   // Coords implausibly far from state centroid → snap to centroid
   const [stateLng, stateLat] = centroid;
-  const lngDelta = Math.abs(lng - stateLng);
-  const latDelta = Math.abs(lat - stateLat);
+  const lngDelta = Math.abs(resource.lng - stateLng);
+  const latDelta = Math.abs(resource.lat - stateLat);
   if (lngDelta > 8.5 || latDelta > 6) return centroid;
 
-  return [lng, lat];
+  return [resource.lng, resource.lat];
 }
 
 interface MapViewProps {
