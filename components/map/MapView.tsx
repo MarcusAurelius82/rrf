@@ -45,6 +45,30 @@ function isValidUSCoord(lat: unknown, lng: unknown, state?: string): boolean {
   return true;
 }
 
+/**
+ * Returns a safe [lng, lat] to render a marker at.
+ * Falls back to the state centroid when coords are invalid or implausibly
+ * far from the state center (geocoding errors placing resources in water/wrong state).
+ */
+function getSafeResourceCoord(resource: Resource): [number, number] | null {
+  // Invalid coords → use centroid, or drop marker if no centroid
+  if (!isValidUSCoord(resource.lat, resource.lng, resource.state)) {
+    return STATE_CENTROIDS[resource.state] ?? null;
+  }
+
+  // No centroid to sanity-check against → trust raw coords
+  const centroid = STATE_CENTROIDS[resource.state];
+  if (!centroid) return [resource.lng, resource.lat];
+
+  // Coords implausibly far from state centroid → snap to centroid
+  const [stateLng, stateLat] = centroid;
+  const lngDelta = Math.abs(resource.lng - stateLng);
+  const latDelta = Math.abs(resource.lat - stateLat);
+  if (lngDelta > 8.5 || latDelta > 6) return centroid;
+
+  return [resource.lng, resource.lat];
+}
+
 interface MapViewProps {
   resources: Resource[];
   selectedState: string | null;
@@ -184,7 +208,8 @@ export function MapView({
       : resources;
 
     filtered.forEach(resource => {
-      if (!isValidUSCoord(resource.lat, resource.lng, resource.state)) return;
+      const safeCoord = getSafeResourceCoord(resource);
+      if (!safeCoord) return;
       const cat = CATEGORY_CONFIG[resource.category];
 
       const el = buildMarkerElement({ category: resource.category, urgent: resource.urgent });
@@ -201,7 +226,7 @@ export function MapView({
         .setHTML(buildPopupHTML(resource, cat.color, cat.label));
 
       const marker = new mapboxgl.Marker({ element: el })
-        .setLngLat([resource.lng, resource.lat])
+        .setLngLat(safeCoord)
         .setPopup(popup)
         .addTo(map.current!);
 
