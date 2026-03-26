@@ -9,7 +9,8 @@
     "lint": "next lint",
     "db:push": "supabase db push",
     "db:types": "supabase gen types typescript --local > types/supabase.ts",
-    "seed:data": "tsx scripts/seed-data.ts"
+    "seed:data": "tsx scripts/seed-data.ts",
+    "seed:211": "tsx scripts/seed-211.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.0",

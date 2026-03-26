@@ -20,11 +20,29 @@ const US_BOUNDS: [[number, number], [number, number]] = [
   [-60,  72],
 ];
 
-/** Returns true only if coordinates fall within US bounds (matches API filter) */
-function isValidUSCoord(lat: unknown, lng: unknown): boolean {
+/**
+ * Per-state "don't render west of this longitude" limit.
+ * Prevents 211 API geocoding errors (waterfront addresses snapped into bays/ocean)
+ * from placing markers in water. Values chosen to be ~0.1° inside the true coastline.
+ */
+const COASTAL_WEST_LIMIT: Partial<Record<string, number>> = {
+  CA: -122.6,  // Golden Gate ~-122.51; excludes SF Bay overshots + Pacific outliers
+  OR: -124.2,
+  WA: -124.4,
+  NY: -74.3,   // Western edge of NYC outer islands
+  FL: -87.6,
+  TX: -97.5,   // Corpus Christi coast
+  ME: -71.0,
+  MA: -71.0,
+};
+
+/** Returns true only if coordinates fall within US bounds and are not in coastal water */
+function isValidUSCoord(lat: unknown, lng: unknown, state?: string): boolean {
   const la = Number(lat), lo = Number(lng);
-  return Number.isFinite(la) && Number.isFinite(lo) &&
-    la >= 24 && la <= 49 && lo >= -125 && lo <= -66;
+  if (!Number.isFinite(la) || !Number.isFinite(lo)) return false;
+  if (la < 24 || la > 49 || lo < -125 || lo > -66) return false;
+  if (state && COASTAL_WEST_LIMIT[state] !== undefined && lo < COASTAL_WEST_LIMIT[state]!) return false;
+  return true;
 }
 
 interface MapViewProps {
@@ -166,16 +184,16 @@ export function MapView({
       : resources;
 
     filtered.forEach(resource => {
-      if (!isValidUSCoord(resource.lat, resource.lng)) return;
+      if (!isValidUSCoord(resource.lat, resource.lng, resource.state)) return;
       const cat = CATEGORY_CONFIG[resource.category];
 
       const el = buildMarkerElement({ category: resource.category, urgent: resource.urgent });
       el.setAttribute("role", "button");
       el.setAttribute("aria-label", `${resource.name} — ${cat.label}`);
       el.setAttribute("tabindex", "0");
-      el.style.transition = "transform 0.15s";
-      el.onmouseenter = () => { el.style.transform = "scale(1.4)"; };
-      el.onmouseleave = () => { el.style.transform = "scale(1)"; };
+      const pinInner = el.firstElementChild as HTMLElement;
+      el.onmouseenter = () => { pinInner.style.transform = "scale(1.4)"; };
+      el.onmouseleave = () => { pinInner.style.transform = "scale(1)"; };
       el.onclick = (e) => { e.stopPropagation(); onSelectState(resource.state); };
       el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") onSelectState(resource.state); };
 
@@ -224,9 +242,11 @@ export function MapView({
       el.setAttribute("role", "button");
       el.setAttribute("aria-label", `${stateCode}: ${info.count} resources`);
       el.setAttribute("tabindex", "0");
-      el.style.transition = "transform 0.15s";
-      el.onmouseenter = () => { el.style.transform = "scale(1.2)"; };
-      el.onmouseleave = () => { el.style.transform = "scale(1)"; };
+      // Inner element receives hover transforms — el is never transformed
+      const clusterInner = document.createElement("div");
+      clusterInner.style.cssText = `position:relative;width:${size}px;height:${size}px;transition:transform 0.15s;`;
+      el.onmouseenter = () => { clusterInner.style.transform = "scale(1.2)"; };
+      el.onmouseleave = () => { clusterInner.style.transform = "scale(1)"; };
 
       const circle = document.createElement("div");
       circle.style.cssText = `
@@ -245,7 +265,7 @@ export function MapView({
       `;
       label.textContent = String(info.count);
       circle.appendChild(label);
-      el.appendChild(circle);
+      clusterInner.appendChild(circle);
 
       if (info.hasUrgent) {
         const badge = document.createElement("div");
@@ -254,8 +274,10 @@ export function MapView({
           width:8px;height:8px;border-radius:50%;
           background:#ef4444;box-shadow:0 0 4px #ef4444;
         `;
-        el.appendChild(badge);
+        clusterInner.appendChild(badge);
       }
+
+      el.appendChild(clusterInner);
 
       el.onclick = (e) => {
         e.stopPropagation();
