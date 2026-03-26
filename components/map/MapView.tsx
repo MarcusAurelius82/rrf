@@ -331,7 +331,7 @@ export function MapView({
     if (!map.current || !mapLoaded) return;
     if (themeRef.current === theme) return;
     themeRef.current = theme;
-    map.current.once("styledata", () => {
+    map.current.once("idle", () => {
       if (!map.current) return;
       if (map.current.getZoom() < 6) renderStateMarkers();
       else renderMarkers();
