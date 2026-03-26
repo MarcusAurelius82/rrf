@@ -197,6 +197,7 @@ export function MapView({
       <div style="font-size:12px;font-weight:700;color:var(--popup-text);margin-bottom:6px;line-height:1.3">${resource.name}</div>
       <div style="font-size:10px;color:var(--popup-sub)">${resource.address}</div>
       ${resource.phone ? `<div style="font-size:10px;color:var(--popup-sub);margin-top:3px">${resource.phone}</div>` : ""}
+      <div style="font-size:9px;color:#888;margin-top:6px;letter-spacing:0.06em">lat: ${resource.lat} · lng: ${resource.lng}</div>
       ${resource.urgent ? `<div style="font-size:8px;color:#ef4444;margin-top:5px;letter-spacing:0.1em;font-weight:700">⚠ URGENT</div>` : ""}
     </div>`;
   }
@@ -224,16 +225,16 @@ export function MapView({
       const pinInner = el.firstElementChild as HTMLElement;
       el.onmouseenter = () => { pinInner.style.transform = "scale(1.4)"; };
       el.onmouseleave = () => { pinInner.style.transform = "scale(1)"; };
-      el.onclick = (e) => { e.stopPropagation(); onSelectState(resource.state); };
-      el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") onSelectState(resource.state); };
-
-      const popup = new mapboxgl.Popup({ offset: 12, closeButton: false, maxWidth: "240px" })
+      const popup = new mapboxgl.Popup({ offset: 12, closeButton: true, maxWidth: "260px" })
         .setHTML(buildPopupHTML(resource, cat.color, cat.label));
 
       const marker = new mapboxgl.Marker({ element: el })
         .setLngLat(safeCoord)
         .setPopup(popup)
         .addTo(map.current!);
+
+      el.onclick = (e) => { e.stopPropagation(); marker.togglePopup(); onSelectState(resource.state); };
+      el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { marker.togglePopup(); onSelectState(resource.state); } };
 
       markersRef.current.push(marker);
     });
