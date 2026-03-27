@@ -124,6 +124,7 @@ export function MapView({
   const [mapLoaded, setMapLoaded]   = useState(false);
   const [clicking, setClicking]     = useState(false);
   const [mapZoom, setMapZoom]       = useState(3.8);
+  const [clusterMode, setClusterMode] = useState(true); // true = zoom < 6, show state clusters
   const [mapCenter, setMapCenter]   = useState<{ lat: number; lng: number }>({ lat: 37.09, lng: -95.71 });
 
   // ── Init map ──────────────────────────────────────────────────────────────
@@ -156,7 +157,9 @@ export function MapView({
 
     map.current.on("zoomend", () => {
       if (!map.current) return;
-      setMapZoom(map.current.getZoom());
+      const z = map.current.getZoom();
+      setMapZoom(z);
+      setClusterMode(z < 6);
     });
 
     // ── Click anywhere on map → reverse-geocode → select state ──────────────
@@ -380,9 +383,11 @@ export function MapView({
   }, [theme, mapLoaded, renderMarkers, renderStateMarkers]);
 
   // ── Zoom-aware render: state clusters below zoom 6, individual pins above ──
+  // Uses clusterMode (boolean) not raw mapZoom — only re-renders when crossing
+  // the zoom 6 threshold, not on every scroll tick.
   useEffect(() => {
     if (!mapLoaded) return;
-    if (mapZoom < 6) {
+    if (clusterMode) {
       markersRef.current.forEach(m => m.remove());
       markersRef.current = [];
       renderStateMarkers();
@@ -391,7 +396,7 @@ export function MapView({
       stateMarkersRef.current = [];
       renderMarkers();
     }
-  }, [mapZoom, mapLoaded, renderMarkers, renderStateMarkers]);
+  }, [clusterMode, mapLoaded, renderMarkers, renderStateMarkers]);
 
   // ── Fly to selected state ─────────────────────────────────────────────────
   useEffect(() => {
