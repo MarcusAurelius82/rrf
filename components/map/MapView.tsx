@@ -1,10 +1,9 @@
 "use client";
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { Resource, ResourceCategory } from "@/types";
 import { CATEGORY_CONFIG } from "@/lib/utils";
-import { buildMarkerElement } from "@/lib/mapbox";
 import { useTheme } from "@/lib/theme";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
@@ -14,29 +13,22 @@ const MAP_STYLES: Record<"dark" | "light", string> = {
   light: "mapbox://styles/mapbox/light-v11",
 };
 
-// US bounding box — ignore clicks outside continental US / territories
 const US_BOUNDS: [[number, number], [number, number]] = [
   [-180, 15],
   [-60,  72],
 ];
 
-/**
- * Per-state "don't render west of this longitude" limit.
- * Prevents 211 API geocoding errors (waterfront addresses snapped into bays/ocean)
- * from placing markers in water. Values chosen to be ~0.1° inside the true coastline.
- */
 const COASTAL_WEST_LIMIT: Partial<Record<string, number>> = {
-  CA: -122.6,  // Golden Gate ~-122.51; excludes SF Bay overshots + Pacific outliers
+  CA: -122.6,
   OR: -124.2,
   WA: -124.4,
-  NY: -74.3,   // Western edge of NYC outer islands
+  NY: -74.3,
   FL: -87.6,
-  TX: -97.5,   // Corpus Christi coast
+  TX: -97.5,
   ME: -71.0,
   MA: -71.0,
 };
 
-/** Returns true only if coordinates fall within US bounds and are not in coastal water */
 function isValidUSCoord(lat: unknown, lng: unknown, state?: string): boolean {
   const la = Number(lat), lo = Number(lng);
   if (!Number.isFinite(la) || !Number.isFinite(lo)) return false;
@@ -45,27 +37,14 @@ function isValidUSCoord(lat: unknown, lng: unknown, state?: string): boolean {
   return true;
 }
 
-/**
- * Returns a safe [lng, lat] to render a marker at.
- * Falls back to the state centroid when coords are invalid or implausibly
- * far from the state center (geocoding errors placing resources in water/wrong state).
- */
 function getSafeResourceCoord(resource: Resource): [number, number] | null {
-  // Invalid coords → use centroid, or drop marker if no centroid
   if (!isValidUSCoord(resource.lat, resource.lng, resource.state)) {
     return STATE_CENTROIDS[resource.state] ?? null;
   }
-
-  // No centroid to sanity-check against → trust raw coords
   const centroid = STATE_CENTROIDS[resource.state];
   if (!centroid) return [resource.lng, resource.lat];
-
-  // Coords implausibly far from state centroid → snap to centroid
   const [stateLng, stateLat] = centroid;
-  const lngDelta = Math.abs(resource.lng - stateLng);
-  const latDelta = Math.abs(resource.lat - stateLat);
-  if (lngDelta > 8.5 || latDelta > 6) return centroid;
-
+  if (Math.abs(resource.lng - stateLng) > 8.5 || Math.abs(resource.lat - stateLat) > 6) return centroid;
   return [resource.lng, resource.lat];
 }
 
@@ -78,7 +57,6 @@ interface MapViewProps {
   onMobilePanelToggle?: () => void;
 }
 
-// State centroids for fly-to
 const STATE_CENTROIDS: Record<string, [number, number]> = {
   AL:[-86.8,32.8],AK:[-153,64],AZ:[-111.1,34.3],AR:[-92.4,34.9],CA:[-119.7,37.2],
   CO:[-105.5,39.0],CT:[-72.7,41.6],DE:[-75.5,39.0],FL:[-81.5,27.9],GA:[-83.4,32.7],
@@ -93,7 +71,6 @@ const STATE_CENTROIDS: Record<string, [number, number]> = {
   DC:[-77.0,38.9],PR:[-66.5,18.2],
 };
 
-/** Reverse-geocode a lng/lat to a 2-letter US state code via Mapbox */
 async function reverseGeocodeState(lng: number, lat: number): Promise<string | null> {
   try {
     const url =
@@ -101,10 +78,170 @@ async function reverseGeocodeState(lng: number, lat: number): Promise<string | n
       `?types=region&country=US&access_token=${mapboxgl.accessToken}`;
     const res  = await fetch(url);
     const json = await res.json() as { features?: Array<{ properties?: { short_code?: string } }> };
-    const code = json.features?.[0]?.properties?.short_code; // e.g. "US-NY"
+    const code = json.features?.[0]?.properties?.short_code;
     if (code?.startsWith("US-")) return code.slice(3).toUpperCase();
   } catch { /* ignore */ }
   return null;
+}
+
+function buildGroupPopupHTML(group: Resource[]): string {
+  const primary = group[0];
+  const multi = group.length > 1;
+  const hasUrgent = group.some(r => r.urgent);
+
+  const serviceRows = group.map(r => {
+    const cat = CATEGORY_CONFIG[r.category];
+    return `<div style="display:flex;align-items:baseline;gap:6px;padding:4px 0;border-bottom:1px solid var(--popup-border);">
+      <span style="font-size:7px;color:${cat.color};letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap">${cat.label}</span>
+      <span style="font-size:11px;font-weight:600;color:var(--popup-text);line-height:1.3">${r.name}</span>
+      ${r.urgent ? `<span style="font-size:7px;color:#ef4444;font-weight:700;white-space:nowrap">⚠ URGENT</span>` : ""}
+    </div>`;
+  }).join("");
+
+  return `<div style="background:var(--popup-bg);border:1px solid var(--popup-border);border-radius:8px;padding:10px;font-family:'IBM Plex Mono',monospace;min-width:220px;max-width:280px;">
+    ${multi ? `<div style="font-size:8px;color:#2563eb;letter-spacing:0.1em;margin-bottom:6px;text-transform:uppercase">${group.length} SERVICES AT THIS LOCATION</div>` : ""}
+    <div style="margin-bottom:6px">${serviceRows}</div>
+    <div style="font-size:10px;color:var(--popup-sub);margin-top:6px">${primary.address}, ${primary.city}</div>
+    ${primary.phone ? `<div style="font-size:10px;color:var(--popup-sub);margin-top:2px">${primary.phone}</div>` : ""}
+    ${hasUrgent && !multi ? "" : ""}
+  </div>`;
+}
+
+/** Deduplicate resources by address, build a GeoJSON FeatureCollection */
+function buildResourceGeoJSON(resources: Resource[], activeCategory: ResourceCategory | null) {
+  const filtered = activeCategory
+    ? resources.filter(r => r.category === activeCategory)
+    : resources;
+
+  const groups = new Map<string, Resource[]>();
+  for (const r of filtered) {
+    const key = `${r.address.toLowerCase().trim()}|${r.zip.trim()}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(r);
+  }
+
+  const features: Array<{
+    type: "Feature";
+    geometry: { type: "Point"; coordinates: [number, number] };
+    properties: { ids: string; category: string; urgent: boolean };
+  }> = [];
+
+  for (const group of groups.values()) {
+    const primary = group[0];
+    const coord = getSafeResourceCoord(primary);
+    if (!coord) continue;
+    features.push({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: coord },
+      properties: {
+        ids: JSON.stringify(group.map(r => r.id)),
+        category: primary.category,
+        urgent: group.some(r => r.urgent),
+      },
+    });
+  }
+
+  return { type: "FeatureCollection" as const, features };
+}
+
+/** Add the resource source and all rendering layers to a map instance */
+function setupMapLayers(m: mapboxgl.Map) {
+  if (m.getSource("resources")) return; // already set up (e.g. after theme switch)
+
+  m.addSource("resources", {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] },
+    cluster: true,
+    clusterMaxZoom: 11,
+    clusterRadius: 40,
+  });
+
+  // Cluster bubble
+  m.addLayer({
+    id: "clusters",
+    type: "circle",
+    source: "resources",
+    filter: ["has", "point_count"],
+    paint: {
+      "circle-color": "#2563eb",
+      "circle-radius": ["step", ["get", "point_count"], 14, 10, 18, 100, 22],
+      "circle-stroke-width": 1.5,
+      "circle-stroke-color": "rgba(255,255,255,0.25)",
+    },
+  });
+
+  // Cluster count label
+  m.addLayer({
+    id: "cluster-count",
+    type: "symbol",
+    source: "resources",
+    filter: ["has", "point_count"],
+    layout: {
+      "text-field": ["get", "point_count_abbreviated"],
+      "text-size": 11,
+      "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
+    },
+    paint: { "text-color": "#ffffff" },
+  });
+
+  // Individual pins — color by category
+  m.addLayer({
+    id: "resource-pins",
+    type: "circle",
+    source: "resources",
+    filter: ["!", ["has", "point_count"]],
+    paint: {
+      "circle-color": [
+        "match", ["get", "category"],
+        "shelter",  "#3b82f6",
+        "food",     "#22c55e",
+        "legal",    "#a855f7",
+        "medical",  "#ef4444",
+        "language", "#f59e0b",
+        "#2563eb",
+      ],
+      "circle-radius": 7,
+      "circle-stroke-width": 1.5,
+      "circle-stroke-color": "rgba(255,255,255,0.25)",
+    },
+  });
+
+  // Urgent ring — red outline on urgent pins
+  m.addLayer({
+    id: "resource-pins-urgent",
+    type: "circle",
+    source: "resources",
+    filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "urgent"], true]],
+    paint: {
+      "circle-color": "transparent",
+      "circle-radius": 10,
+      "circle-stroke-width": 2,
+      "circle-stroke-color": "#ef4444",
+    },
+  });
+
+  // Pointer cursor
+  const setCursor = (cur: string) => () => { m.getCanvas().style.cursor = cur; };
+  m.on("mouseenter", "clusters",      setCursor("pointer"));
+  m.on("mouseleave", "clusters",      setCursor("pointer"));
+  m.on("mouseenter", "resource-pins", setCursor("pointer"));
+  m.on("mouseleave", "resource-pins", setCursor("pointer"));
+
+  // Click cluster → zoom to expand
+  m.on("click", "clusters", (e) => {
+    const feature = e.features?.[0];
+    if (!feature) return;
+    const clusterId = feature.properties?.cluster_id;
+    (m.getSource("resources") as mapboxgl.GeoJSONSource)
+      .getClusterExpansionZoom(clusterId, (err, zoom) => {
+        if (err || zoom == null) return;
+        m.flyTo({
+          center: (feature.geometry as GeoJSON.Point).coordinates as [number, number],
+          zoom,
+          duration: 800,
+        });
+      });
+  });
 }
 
 export function MapView({
@@ -116,14 +253,16 @@ export function MapView({
   onMobilePanelToggle,
 }: MapViewProps) {
   const { theme } = useTheme();
-  const mapContainer      = useRef<HTMLDivElement>(null);
-  const map               = useRef<mapboxgl.Map | null>(null);
-  const markersRef        = useRef<mapboxgl.Marker[]>([]);
-  const stateMarkersRef   = useRef<mapboxgl.Marker[]>([]);
-  const geocodingRef      = useRef(false); // debounce reverse-geocode requests
-  const [mapLoaded, setMapLoaded]   = useState(false);
-  const [clicking, setClicking]     = useState(false);
-  const [mapCenter, setMapCenter]   = useState<{ lat: number; lng: number }>({ lat: 37.09, lng: -95.71 });
+  const mapContainer   = useRef<HTMLDivElement>(null);
+  const map            = useRef<mapboxgl.Map | null>(null);
+  const popupRef       = useRef<mapboxgl.Popup | null>(null);
+  const geocodingRef   = useRef(false);
+  const onSelectRef    = useRef(onSelectState);
+  onSelectRef.current  = onSelectState; // always latest without re-init
+
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [clicking, setClicking]   = useState(false);
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 37.09, lng: -95.71 });
 
   // ── Init map ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -141,9 +280,8 @@ export function MapView({
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
 
     map.current.on("load", () => {
+      setupMapLayers(map.current!);
       setMapLoaded(true);
-
-      // Show pointer cursor over the map to hint it's clickable
       map.current!.getCanvas().style.cursor = "pointer";
     });
 
@@ -153,22 +291,19 @@ export function MapView({
       setMapCenter({ lat: c.lat, lng: c.lng });
     });
 
-    // ── Click anywhere on map → reverse-geocode → select state ──────────────
+    // Click map → reverse-geocode → select state
     map.current.on("click", async (e) => {
-      if (geocodingRef.current) return; // already processing a click
+      if (geocodingRef.current) return;
       const { lng, lat } = e.lngLat;
-
-      // Rough US bounding box check before hitting the API
       if (
         lng < US_BOUNDS[0][0] || lng > US_BOUNDS[1][0] ||
         lat < US_BOUNDS[0][1] || lat > US_BOUNDS[1][1]
       ) return;
-
       geocodingRef.current = true;
       setClicking(true);
       try {
         const stateCode = await reverseGeocodeState(lng, lat);
-        if (stateCode) onSelectState(stateCode);
+        if (stateCode) onSelectRef.current(stateCode);
       } finally {
         geocodingRef.current = false;
         setClicking(false);
@@ -179,186 +314,44 @@ export function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Popup HTML — single or grouped resources at one address ─────────────
-  function buildGroupPopupHTML(group: Resource[]): string {
-    const primary = group[0];
-    const multi = group.length > 1;
-    const hasUrgent = group.some(r => r.urgent);
-
-    const serviceRows = group.map(r => {
-      const cat = CATEGORY_CONFIG[r.category];
-      return `<div style="display:flex;align-items:baseline;gap:6px;padding:4px 0;border-bottom:1px solid var(--popup-border);">
-        <span style="font-size:7px;color:${cat.color};letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap">${cat.label}</span>
-        <span style="font-size:11px;font-weight:600;color:var(--popup-text);line-height:1.3">${r.name}</span>
-        ${r.urgent ? `<span style="font-size:7px;color:#ef4444;font-weight:700;white-space:nowrap">⚠ URGENT</span>` : ""}
-      </div>`;
-    }).join("");
-
-    return `<div style="background:var(--popup-bg);border:1px solid var(--popup-border);border-radius:8px;padding:10px;font-family:'IBM Plex Mono',monospace;min-width:220px;max-width:280px;">
-      ${multi ? `<div style="font-size:8px;color:#2563eb;letter-spacing:0.1em;margin-bottom:6px;text-transform:uppercase">${group.length} SERVICES AT THIS LOCATION</div>` : ""}
-      <div style="margin-bottom:6px">${serviceRows}</div>
-      <div style="font-size:10px;color:var(--popup-sub);margin-top:6px">${primary.address}, ${primary.city}</div>
-      ${primary.phone ? `<div style="font-size:10px;color:var(--popup-sub);margin-top:2px">${primary.phone}</div>` : ""}
-      ${hasUrgent && !multi ? "" : ""}
-      <div style="font-size:9px;color:#888;margin-top:6px;letter-spacing:0.06em">lat: ${primary.lat} · lng: ${primary.lng}</div>
-    </div>`;
-  }
-
-  // ── Render individual resource pins (zoom ≥ 6) ───────────────────────────
-  const renderMarkers = useCallback(() => {
-    if (!map.current || !mapLoaded) return;
-
-    const currentZoom = map.current.getZoom();
-    console.log(`[MapView] renderMarkers called — zoom: ${currentZoom.toFixed(2)}, resources: ${resources.length}`);
-
-    markersRef.current.forEach(m => m.remove());
-    markersRef.current = [];
-
-    const filtered = activeCategory
-      ? resources.filter(r => r.category === activeCategory)
-      : resources;
-
-    // Group resources at the same address into one marker
-    const groups = new Map<string, Resource[]>();
-    for (const r of filtered) {
-      const key = `${r.address.toLowerCase().trim()}|${r.zip.trim()}`;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(r);
-    }
-
-    let centroidSnaps = 0;
-    for (const group of groups.values()) {
-      const primary = group[0];
-      const rawCoord: [number, number] = [primary.lng, primary.lat];
-      const safeCoord = getSafeResourceCoord(primary);
-      if (!safeCoord) continue;
-
-      const snapped = safeCoord[0] !== rawCoord[0] || safeCoord[1] !== rawCoord[1];
-      if (snapped) centroidSnaps++;
-
-      const hasUrgent = group.some(r => r.urgent);
-      const cat = CATEGORY_CONFIG[primary.category];
-
-      const el = buildMarkerElement({ category: primary.category, urgent: hasUrgent });
-      el.setAttribute("role", "button");
-      el.setAttribute("aria-label",
-        group.length > 1
-          ? `${group.length} services at ${primary.address}`
-          : `${primary.name} — ${cat.label}`
-      );
-      el.setAttribute("tabindex", "0");
-      const pinInner = el.firstElementChild as HTMLElement;
-      el.onmouseenter = () => { pinInner.style.transform = "scale(1.4)"; };
-      el.onmouseleave = () => { pinInner.style.transform = "scale(1)"; };
-
-      const popup = new mapboxgl.Popup({ offset: 12, closeButton: true, maxWidth: "300px" })
-        .setHTML(buildGroupPopupHTML(group));
-
-      const marker = new mapboxgl.Marker({ element: el })
-        .setLngLat(safeCoord)
-        .setPopup(popup)
-        .addTo(map.current!);
-
-      el.onclick = (e) => { e.stopPropagation(); marker.togglePopup(); };
-      el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") marker.togglePopup(); };
-
-      markersRef.current.push(marker);
-    }
-    console.log(`[MapView] placed ${markersRef.current.length} markers (${centroidSnaps} snapped to centroid)`);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // ── Update GeoJSON data when resources / category change ─────────────────
+  useEffect(() => {
+    if (!mapLoaded || !map.current) return;
+    const source = map.current.getSource("resources") as mapboxgl.GeoJSONSource | undefined;
+    if (!source) return;
+    source.setData(buildResourceGeoJSON(resources, activeCategory));
   }, [resources, activeCategory, mapLoaded]);
 
-  // ── Render per-state cluster pins (zoom < 6) ──────────────────────────────
-  const renderStateMarkers = useCallback(() => {
-    if (!map.current || !mapLoaded) return;
+  // ── Pin click handler — needs fresh `resources` for popup content ─────────
+  useEffect(() => {
+    if (!mapLoaded || !map.current) return;
+    const m = map.current;
 
-    stateMarkersRef.current.forEach(m => m.remove());
-    stateMarkersRef.current = [];
+    const handlePinClick = (e: mapboxgl.MapLayerMouseEvent) => {
+      const feature = e.features?.[0];
+      if (!feature) return;
 
-    const filtered = activeCategory
-      ? resources.filter(r => r.category === activeCategory)
-      : resources;
+      let ids: string[] = [];
+      try { ids = JSON.parse(feature.properties?.ids || "[]"); } catch { return; }
 
-    // Aggregate per state
-    const stateInfo: Record<string, { count: number; hasUrgent: boolean }> = {};
-    for (const r of filtered) {
-      if (!stateInfo[r.state]) stateInfo[r.state] = { count: 0, hasUrgent: false };
-      stateInfo[r.state].count++;
-      if (r.urgent) stateInfo[r.state].hasUrgent = true;
-    }
+      const group = ids
+        .map(id => resources.find(r => r.id === id))
+        .filter((r): r is Resource => Boolean(r));
+      if (!group.length) return;
 
-    for (const [stateCode, info] of Object.entries(stateInfo)) {
-      const coords = STATE_CENTROIDS[stateCode];
-      if (!coords) continue;
-
-      // Diameter: 18px min, 36px max, scales with count
-      const size = Math.min(36, Math.max(18, 18 + Math.floor(Math.log2(info.count + 1) * 5)));
-      const fontSize = size <= 22 ? 8 : size <= 28 ? 10 : 11;
-
-      const el = document.createElement("div");
-      el.style.cssText = `position:relative;width:${size}px;height:${size}px;cursor:pointer;`;
-      el.setAttribute("role", "button");
-      el.setAttribute("aria-label", `${stateCode}: ${info.count} resources`);
-      el.setAttribute("tabindex", "0");
-      // Inner element receives hover transforms — el is never transformed
-      const clusterInner = document.createElement("div");
-      clusterInner.style.cssText = `position:relative;width:${size}px;height:${size}px;transition:transform 0.15s;`;
-      el.onmouseenter = () => { clusterInner.style.transform = "scale(1.2)"; };
-      el.onmouseleave = () => { clusterInner.style.transform = "scale(1)"; };
-
-      const circle = document.createElement("div");
-      circle.style.cssText = `
-        width:${size}px;height:${size}px;border-radius:50%;
-        background:#2563eb;
-        box-shadow:0 0 8px #2563eb,0 0 16px rgba(37,99,235,0.4);
-        display:flex;align-items:center;justify-content:center;
-        border:1.5px solid rgba(255,255,255,0.25);box-sizing:border-box;
-      `;
-
-      const label = document.createElement("span");
-      label.style.cssText = `
-        font-family:'IBM Plex Mono',monospace;
-        font-size:${fontSize}px;font-weight:700;color:#ffffff;
-        line-height:1;pointer-events:none;
-      `;
-      label.textContent = String(info.count);
-      circle.appendChild(label);
-      clusterInner.appendChild(circle);
-
-      if (info.hasUrgent) {
-        const badge = document.createElement("div");
-        badge.style.cssText = `
-          position:absolute;top:-3px;right:-3px;
-          width:8px;height:8px;border-radius:50%;
-          background:#ef4444;box-shadow:0 0 4px #ef4444;
-        `;
-        clusterInner.appendChild(badge);
-      }
-
-      el.appendChild(clusterInner);
-
-      el.onclick = (e) => {
-        e.stopPropagation();
-        onSelectState(stateCode);
-        map.current?.flyTo({ center: coords, zoom: 7, duration: 1200, essential: true });
-      };
-      el.onkeydown = (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          onSelectState(stateCode);
-          map.current?.flyTo({ center: coords, zoom: 7, duration: 1200, essential: true });
-        }
-      };
-
-      const marker = new mapboxgl.Marker({ element: el })
+      const coords = (feature.geometry as GeoJSON.Point).coordinates as [number, number];
+      popupRef.current?.remove();
+      popupRef.current = new mapboxgl.Popup({ offset: 12, maxWidth: "300px", closeButton: true })
         .setLngLat(coords)
-        .addTo(map.current!);
+        .setHTML(buildGroupPopupHTML(group))
+        .addTo(m);
+    };
 
-      stateMarkersRef.current.push(marker);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resources, activeCategory, mapLoaded, onSelectState]);
+    m.on("click", "resource-pins", handlePinClick);
+    return () => { m.off("click", "resource-pins", handlePinClick); };
+  }, [resources, mapLoaded]);
 
-  // ── Switch map style when theme changes ───────────────────────────────────
+  // ── Theme switch — re-add layers after new style loads ───────────────────
   const themeRef = useRef(theme);
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
@@ -366,19 +359,13 @@ export function MapView({
     themeRef.current = theme;
     map.current.once("idle", () => {
       if (!map.current) return;
-      renderMarkers();
+      setupMapLayers(map.current);
+      const source = map.current.getSource("resources") as mapboxgl.GeoJSONSource | undefined;
+      source?.setData(buildResourceGeoJSON(resources, activeCategory));
     });
     map.current.setStyle(MAP_STYLES[theme]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [theme, mapLoaded, renderMarkers]);
-
-  // ── Render individual resource pins whenever resources/category/mapLoaded changes ──
-  useEffect(() => {
-    if (!mapLoaded) return;
-    stateMarkersRef.current.forEach(m => m.remove());
-    stateMarkersRef.current = [];
-    renderMarkers();
-  }, [mapLoaded, renderMarkers]);
+  }, [theme, mapLoaded]);
 
   // ── Fly to selected state ─────────────────────────────────────────────────
   useEffect(() => {
@@ -415,7 +402,7 @@ export function MapView({
         </div>
       </div>
 
-      {/* Click-to-select hint — only shown before first state selection */}
+      {/* Click-to-select hint */}
       {!selectedState && mapLoaded && (
         <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
           <div className="font-mono text-[10px] text-content-secondary bg-surface-0/80 border border-border px-3 py-1.5 rounded-full backdrop-blur-sm tracking-[0.08em] whitespace-nowrap">
@@ -424,7 +411,7 @@ export function MapView({
         </div>
       )}
 
-      {/* Loading indicator during reverse geocode */}
+      {/* Loading indicator */}
       {clicking && (
         <div className="absolute inset-0 z-20 pointer-events-none flex items-center justify-center">
           <div className="font-mono text-[11px] text-content-primary bg-surface-0/90 border border-border px-4 py-2 rounded-lg backdrop-blur-sm tracking-[0.1em] animate-pulse">
