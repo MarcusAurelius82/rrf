@@ -266,7 +266,7 @@ export function MapView({
     }
     console.log(`[MapView] placed ${markersRef.current.length} markers (${centroidSnaps} snapped to centroid)`);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resources, activeCategory, mapLoaded, onSelectState]);
+  }, [resources, activeCategory, mapLoaded]);
 
   // ── Render per-state cluster pins (zoom < 6) ──────────────────────────────
   const renderStateMarkers = useCallback(() => {

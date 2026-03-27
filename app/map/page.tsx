@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Navbar } from "@/components/ui/Navbar";
 import { Sidebar } from "@/components/ui/Sidebar";
 import { MapView } from "@/components/map/MapView";
@@ -77,12 +77,12 @@ export default function MapPage() {
     finally { setIsLoading(false); }
   }
 
-  function handleSelectState(state: string) {
+  const handleSelectState = useCallback((state: string) => {
     setSelectedState(state);
     setAiSummary(undefined);
     // On mobile, open the resource panel when a state is selected
     setMobilePanelOpen(true);
-  }
+  }, []);
 
   const categoryCounts = Object.fromEntries(
     Object.keys(CATEGORY_CONFIG).map(cat => [cat, resources.filter(r => r.category === cat).length])
