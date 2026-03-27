@@ -214,6 +214,9 @@ export function MapView({
   const renderMarkers = useCallback(() => {
     if (!map.current || !mapLoaded) return;
 
+    const currentZoom = map.current.getZoom();
+    console.log(`[MapView] renderMarkers called — zoom: ${currentZoom.toFixed(2)}, resources: ${resources.length}`);
+
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
@@ -229,10 +232,15 @@ export function MapView({
       groups.get(key)!.push(r);
     }
 
+    let centroidSnaps = 0;
     for (const group of groups.values()) {
       const primary = group[0];
+      const rawCoord: [number, number] = [primary.lng, primary.lat];
       const safeCoord = getSafeResourceCoord(primary);
       if (!safeCoord) continue;
+
+      const snapped = safeCoord[0] !== rawCoord[0] || safeCoord[1] !== rawCoord[1];
+      if (snapped) centroidSnaps++;
 
       const hasUrgent = group.some(r => r.urgent);
       const cat = CATEGORY_CONFIG[primary.category];
@@ -262,6 +270,7 @@ export function MapView({
 
       markersRef.current.push(marker);
     }
+    console.log(`[MapView] placed ${markersRef.current.length} markers (${centroidSnaps} snapped to centroid)`);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resources, activeCategory, mapLoaded, onSelectState]);
 
