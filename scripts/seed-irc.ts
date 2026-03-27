@@ -177,14 +177,14 @@ const IRC_OFFICES: IrcOffice[] = [
   },
   {
     city: "Miami", state: "FL",
-    address: "3250 Mary Street, Suite 400", zip: "33133",
+    address: "730 Northwest 107th Avenue, Suite 100", zip: "33172",
     website: "https://www.rescue.org/united-states/miami-fl",
     languages: ["English", "Creole", "French", "Portuguese", "Spanish"],
   },
   {
     city: "Missoula", state: "MT",
     address: "3203 S. Russell Street", zip: "59801",
-    phone: "(406) 926-1992",
+    phone: "(406) 926-1982",
     website: "https://www.rescue.org/united-states/missoula-mt",
     languages: ["English", "Arabic", "Burmese", "Dari", "Karen", "Somali", "Spanish", "Ukrainian"],
   },
@@ -197,7 +197,7 @@ const IRC_OFFICES: IrcOffice[] = [
   },
   {
     city: "Oakland", state: "CA",
-    address: "1305 Franklin Street", zip: "94612",
+    address: "440 Grand Avenue, Suite 500", zip: "94610",
     phone: "(510) 452-8222",
     website: "https://www.rescue.org/united-states/oakland-ca",
     languages: ["English", "Arabic", "Dari", "Mam", "Q'anjob'al", "Spanish", "Tigrinya", "Vietnamese"],
@@ -211,7 +211,8 @@ const IRC_OFFICES: IrcOffice[] = [
   },
   {
     city: "Richmond", state: "VA",
-    address: "1301 North Hamilton Street, Suite 101", zip: "23230",
+    address: "2004 Bremo Road, Suite 200", zip: "23226",
+    phone: "(804) 308-9144",
     website: "https://www.rescue.org/united-states/richmond-va",
     languages: ["English", "Arabic", "Dari", "French", "Kinyarwanda", "Pashto", "Somali", "Spanish"],
   },
@@ -265,7 +266,7 @@ const IRC_OFFICES: IrcOffice[] = [
   },
   {
     city: "Tallahassee", state: "FL",
-    address: "618 N. Gadsden Street", zip: "32303",
+    address: "1845 N. Martin Luther King Jr. Blvd.", zip: "32303",
     website: "https://www.rescue.org/united-states/tallahassee-fl",
     languages: ["English", "Arabic", "French", "Haitian Creole", "Spanish", "Swahili"],
   },
