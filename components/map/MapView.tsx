@@ -115,7 +115,9 @@ function buildResourceGeoJSON(resources: Resource[], activeCategory: ResourceCat
 
   const groups = new Map<string, Resource[]>();
   for (const r of filtered) {
-    const key = `${r.address.toLowerCase().trim()}|${r.zip.trim()}`;
+    const addr = r.address ?? "";
+    const zip  = r.zip ?? "";
+    const key  = `${addr.toLowerCase().trim()}|${zip.trim()}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(r);
   }
@@ -280,7 +282,10 @@ export function MapView({
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
 
     map.current.on("load", () => {
+      console.log("[MapView] map loaded, setting up layers");
       setupMapLayers(map.current!);
+      // Ensure canvas matches container dimensions (flex layout may not be settled yet)
+      map.current!.resize();
       setMapLoaded(true);
       map.current!.getCanvas().style.cursor = "pointer";
     });
@@ -318,8 +323,10 @@ export function MapView({
   useEffect(() => {
     if (!mapLoaded || !map.current) return;
     const source = map.current.getSource("resources") as mapboxgl.GeoJSONSource | undefined;
-    if (!source) return;
-    source.setData(buildResourceGeoJSON(resources, activeCategory));
+    if (!source) { console.warn("[MapView] source 'resources' not found"); return; }
+    const geojson = buildResourceGeoJSON(resources, activeCategory);
+    console.log(`[MapView] setData: ${resources.length} resources → ${geojson.features.length} features`);
+    source.setData(geojson);
   }, [resources, activeCategory, mapLoaded]);
 
   // ── Pin click handler — needs fresh `resources` for popup content ─────────
