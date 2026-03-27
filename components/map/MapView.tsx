@@ -123,8 +123,6 @@ export function MapView({
   const geocodingRef      = useRef(false); // debounce reverse-geocode requests
   const [mapLoaded, setMapLoaded]   = useState(false);
   const [clicking, setClicking]     = useState(false);
-  const [mapZoom, setMapZoom]       = useState(3.8);
-  const [clusterMode, setClusterMode] = useState(true); // true = zoom < 6, show state clusters
   const [mapCenter, setMapCenter]   = useState<{ lat: number; lng: number }>({ lat: 37.09, lng: -95.71 });
 
   // ── Init map ──────────────────────────────────────────────────────────────
@@ -153,13 +151,6 @@ export function MapView({
       if (!map.current) return;
       const c = map.current.getCenter();
       setMapCenter({ lat: c.lat, lng: c.lng });
-    });
-
-    map.current.on("zoomend", () => {
-      if (!map.current) return;
-      const z = map.current.getZoom();
-      setMapZoom(z);
-      setClusterMode(z < 6);
     });
 
     // ── Click anywhere on map → reverse-geocode → select state ──────────────
@@ -375,28 +366,19 @@ export function MapView({
     themeRef.current = theme;
     map.current.once("idle", () => {
       if (!map.current) return;
-      if (map.current.getZoom() < 6) renderStateMarkers();
-      else renderMarkers();
+      renderMarkers();
     });
     map.current.setStyle(MAP_STYLES[theme]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [theme, mapLoaded, renderMarkers, renderStateMarkers]);
+  }, [theme, mapLoaded, renderMarkers]);
 
-  // ── Zoom-aware render: state clusters below zoom 6, individual pins above ──
-  // Uses clusterMode (boolean) not raw mapZoom — only re-renders when crossing
-  // the zoom 6 threshold, not on every scroll tick.
+  // ── Render individual resource pins whenever resources/category/mapLoaded changes ──
   useEffect(() => {
     if (!mapLoaded) return;
-    if (clusterMode) {
-      markersRef.current.forEach(m => m.remove());
-      markersRef.current = [];
-      renderStateMarkers();
-    } else {
-      stateMarkersRef.current.forEach(m => m.remove());
-      stateMarkersRef.current = [];
-      renderMarkers();
-    }
-  }, [clusterMode, mapLoaded, renderMarkers, renderStateMarkers]);
+    stateMarkersRef.current.forEach(m => m.remove());
+    stateMarkersRef.current = [];
+    renderMarkers();
+  }, [mapLoaded, renderMarkers]);
 
   // ── Fly to selected state ─────────────────────────────────────────────────
   useEffect(() => {
