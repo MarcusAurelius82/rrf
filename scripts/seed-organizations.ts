@@ -1060,23 +1060,36 @@ async function main() {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // Check whether the multi-category constraint is already in place.
-  // We query pg_constraint directly — no DDL needed, just a read.
-  const { data: constraintRows } = await supabase
-    .from("pg_constraint" as never)
-    .select("conname")
-    .eq("conname", "resources_name_zip_category_unique")
-    .limit(1);
+  // Verify the (name,zip,category) constraint exists by attempting a dry-run
+  // upsert with a single throwaway row. If it fails with "no unique or
+  // exclusion constraint", the migration hasn't been applied yet.
+  console.log("Checking schema constraint…");
+  const probe = {
+    name: "__constraint_probe__",
+    category: "legal" as const,
+    status: "open" as const,
+    address: "1 Test St",
+    city: "Test",
+    state: "CA",
+    zip: "00000",
+    lat: 0,
+    lng: 0,
+    phone: null,
+    website: null,
+    languages: null,
+    urgent: false,
+    verified: false,
+  };
+  const { error: probeErr } = await supabase
+    .from("resources")
+    .upsert(probe, { onConflict: "name,zip,category" });
 
-  const hasNewConstraint =
-    Array.isArray(constraintRows) && constraintRows.length > 0;
-
-  if (!hasNewConstraint) {
+  if (
+    probeErr &&
+    probeErr.message.includes("no unique or exclusion constraint")
+  ) {
     console.error(`
 ERROR: Required schema migration has not been applied.
-
-The resources table still has a UNIQUE(name, zip) constraint which blocks
-multi-category rows for the same office.
 
 Run the following in the Supabase SQL editor, then re-run this script:
 
@@ -1084,13 +1097,14 @@ Run the following in the Supabase SQL editor, then re-run this script:
     DROP CONSTRAINT IF EXISTS resources_name_zip_unique,
     ADD CONSTRAINT resources_name_zip_category_unique UNIQUE (name, zip, category);
 
-The migration file is also at:
-  supabase/migrations/20260329_multi_category_constraint.sql
+Migration file: supabase/migrations/20260329_multi_category_constraint.sql
 `);
     process.exit(1);
   }
 
-  console.log("✓ Schema constraint OK (name, zip, category).");
+  // Clean up probe row
+  await supabase.from("resources").delete().eq("name", "__constraint_probe__");
+  console.log("✓ Schema constraint OK.");
 
   let grandTotal = 0;
 
