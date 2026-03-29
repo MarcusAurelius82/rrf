@@ -1060,35 +1060,37 @@ async function main() {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // Migrate unique constraint from (name,zip) → (name,zip,category)
-  // so multiple category rows can exist for the same office.
-  console.log("Applying schema migration: unique constraint → (name, zip, category)…");
-  const { error: migErr } = await supabase.rpc("exec_sql" as never, {
-    sql: `
-      ALTER TABLE resources
-        DROP CONSTRAINT IF EXISTS resources_name_zip_unique,
-        ADD CONSTRAINT resources_name_zip_category_unique UNIQUE (name, zip, category);
-    `,
-  });
-  if (migErr) {
-    // exec_sql RPC may not exist — fall back to raw query via the REST API
-    // This is fine; the constraint change is idempotent and we'll catch
-    // duplicate-key errors per batch instead.
-    console.warn(
-      `  [WARN] Could not run migration via RPC (${migErr.message}).`
-    );
-    console.warn(
-      "  If you see unique-constraint errors below, run this in Supabase SQL editor:"
-    );
-    console.warn(
-      "    ALTER TABLE resources DROP CONSTRAINT IF EXISTS resources_name_zip_unique,"
-    );
-    console.warn(
-      "      ADD CONSTRAINT resources_name_zip_category_unique UNIQUE (name, zip, category);"
-    );
-  } else {
-    console.log("  ✓ Constraint updated.");
+  // Check whether the multi-category constraint is already in place.
+  // We query pg_constraint directly — no DDL needed, just a read.
+  const { data: constraintRows } = await supabase
+    .from("pg_constraint" as never)
+    .select("conname")
+    .eq("conname", "resources_name_zip_category_unique")
+    .limit(1);
+
+  const hasNewConstraint =
+    Array.isArray(constraintRows) && constraintRows.length > 0;
+
+  if (!hasNewConstraint) {
+    console.error(`
+ERROR: Required schema migration has not been applied.
+
+The resources table still has a UNIQUE(name, zip) constraint which blocks
+multi-category rows for the same office.
+
+Run the following in the Supabase SQL editor, then re-run this script:
+
+  ALTER TABLE resources
+    DROP CONSTRAINT IF EXISTS resources_name_zip_unique,
+    ADD CONSTRAINT resources_name_zip_category_unique UNIQUE (name, zip, category);
+
+The migration file is also at:
+  supabase/migrations/20260329_multi_category_constraint.sql
+`);
+    process.exit(1);
   }
+
+  console.log("✓ Schema constraint OK (name, zip, category).");
 
   let grandTotal = 0;
 
