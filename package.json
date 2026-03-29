@@ -11,7 +11,8 @@
     "db:types": "supabase gen types typescript --local > types/supabase.ts",
     "seed:data": "tsx scripts/seed-data.ts",
     "seed:211": "tsx scripts/seed-211.ts",
-    "seed:orgs": "tsx scripts/seed-organizations.ts"
+    "seed:orgs": "tsx scripts/seed-organizations.ts",
+    "seed:irc": "tsx scripts/seed-irc.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.0",
