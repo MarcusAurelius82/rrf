@@ -10,7 +10,8 @@
     "db:push": "supabase db push",
     "db:types": "supabase gen types typescript --local > types/supabase.ts",
     "seed:data": "tsx scripts/seed-data.ts",
-    "seed:211": "tsx scripts/seed-211.ts"
+    "seed:211": "tsx scripts/seed-211.ts",
+    "seed:orgs": "tsx scripts/seed-organizations.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.0",
@@ -37,6 +38,7 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10",
+    "cheerio": "^1.2.0",
     "dotenv": "^16.4.0",
     "eslint": "^8",
     "eslint-config-next": "^14.2.35",
