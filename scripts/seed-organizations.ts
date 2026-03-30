@@ -51,9 +51,11 @@ interface ResourceRow {
   lng: number;
   phone: string | null;
   website: string | null;
+  hours?: Record<string, string> | null;
   languages: string[] | null;
   urgent: boolean;
   verified: boolean;
+  documentation_required?: "none" | "id_only" | "legal_status" | "benefits_eligible" | "unknown";
 }
 
 interface OrgConfig {
@@ -61,6 +63,7 @@ interface OrgConfig {
   url: string;
   categories: ResourceCategory[];
   scrape: () => Promise<OfficeScrape[]>;
+  stateLog?: boolean;
 }
 
 // -----------------------------------------------------------------------
@@ -1000,6 +1003,338 @@ async function scrapeRAICES(): Promise<OfficeScrape[]> {
 }
 
 // -----------------------------------------------------------------------
+// Feeding America food banks
+// -----------------------------------------------------------------------
+
+/**
+ * Fallback list of major Feeding America member food banks.
+ * Used when the all-food-banks page cannot be scraped.
+ * Sources: individual food bank websites, verified early 2026.
+ */
+const FA_FALLBACK: OfficeScrape[] = [
+  {
+    name: "Food Bank of Alaska",
+    address: "2192 Viking Dr",
+    city: "Anchorage",
+    state: "AK",
+    zip: "99501",
+    phone: "907-272-3663",
+    website: "https://www.foodbankofalaska.org",
+  },
+  {
+    name: "St. Mary's Food Bank",
+    address: "2831 N 31st Ave",
+    city: "Phoenix",
+    state: "AZ",
+    zip: "85009",
+    phone: "602-242-3663",
+    website: "https://www.stmarysfoodbank.org",
+  },
+  {
+    name: "Los Angeles Regional Food Bank",
+    address: "1734 E 41st St",
+    city: "Los Angeles",
+    state: "CA",
+    zip: "90058",
+    phone: "323-234-3030",
+    website: "https://www.lafoodbank.org",
+  },
+  {
+    name: "San Francisco-Marin Food Bank",
+    address: "900 Pennsylvania Ave",
+    city: "San Francisco",
+    state: "CA",
+    zip: "94107",
+    phone: "415-282-1900",
+    website: "https://www.sfmfoodbank.org",
+  },
+  {
+    name: "Food Bank of the Rockies",
+    address: "10700 E 45th Ave",
+    city: "Denver",
+    state: "CO",
+    zip: "80239",
+    phone: "303-371-9250",
+    website: "https://www.foodbankrockies.org",
+  },
+  {
+    name: "Connecticut Food Bank",
+    address: "2 Research Pkwy",
+    city: "Wallingford",
+    state: "CT",
+    zip: "06492",
+    phone: "203-469-5000",
+    website: "https://www.ctfoodbank.org",
+  },
+  {
+    name: "Feeding South Florida",
+    address: "2501 SW 32nd Ter",
+    city: "Pembroke Park",
+    state: "FL",
+    zip: "33023",
+    phone: "954-518-1818",
+    website: "https://www.feedingsouthflorida.org",
+  },
+  {
+    name: "Atlanta Community Food Bank",
+    address: "732 Joseph E Lowery Blvd NW",
+    city: "Atlanta",
+    state: "GA",
+    zip: "30318",
+    phone: "404-892-9822",
+    website: "https://www.acfb.org",
+  },
+  {
+    name: "Greater Chicago Food Depository",
+    address: "4100 W Ann Lurie Pl",
+    city: "Chicago",
+    state: "IL",
+    zip: "60632",
+    phone: "773-247-3663",
+    website: "https://www.chicagosfoodbank.org",
+  },
+  {
+    name: "Gleaners Community Food Bank",
+    address: "2131 Beaufait St",
+    city: "Detroit",
+    state: "MI",
+    zip: "48207",
+    phone: "313-923-3535",
+    website: "https://www.gcfb.org",
+  },
+  {
+    name: "Second Harvest Heartland",
+    address: "7101 Winnetka Ave N",
+    city: "Brooklyn Park",
+    state: "MN",
+    zip: "55428",
+    phone: "763-450-3860",
+    website: "https://www.2harvest.org",
+  },
+  {
+    name: "Community Food Bank of New Jersey",
+    address: "31 Evans Terminal",
+    city: "Hillside",
+    state: "NJ",
+    zip: "07205",
+    phone: "908-355-3663",
+    website: "https://www.cfbnj.org",
+  },
+  {
+    name: "Food Bank of New York City",
+    address: "39 Broadway 10th Fl",
+    city: "New York",
+    state: "NY",
+    zip: "10006",
+    phone: "212-566-7855",
+    website: "https://www.foodbanknyc.org",
+  },
+  {
+    name: "Houston Food Bank",
+    address: "535 Portwall St",
+    city: "Houston",
+    state: "TX",
+    zip: "77029",
+    phone: "713-223-3700",
+    website: "https://www.houstonfoodbank.org",
+  },
+  {
+    name: "North Texas Food Bank",
+    address: "3677 Mapleshade Ln",
+    city: "Plano",
+    state: "TX",
+    zip: "75075",
+    phone: "214-341-6328",
+    website: "https://www.ntfb.org",
+  },
+  {
+    name: "Capital Area Food Bank",
+    address: "4900 Puerto Rico Ave NE",
+    city: "Washington",
+    state: "DC",
+    zip: "20017",
+    phone: "202-526-5344",
+    website: "https://www.capitalareafoodbank.org",
+  },
+  {
+    name: "Northwest Harvest",
+    address: "1702 NE 150th St",
+    city: "Shoreline",
+    state: "WA",
+    zip: "98155",
+    phone: "206-625-0755",
+    website: "https://www.northwestharvest.org",
+  },
+  {
+    name: "Oregon Food Bank",
+    address: "7900 NE 33rd Dr",
+    city: "Portland",
+    state: "OR",
+    zip: "97211",
+    phone: "503-282-0555",
+    website: "https://www.oregonfoodbank.org",
+  },
+];
+
+const FA_BASE = "https://www.feedingamerica.org";
+const FA_LIST_URL = `${FA_BASE}/find-your-local-foodbank/all-food-banks`;
+
+/**
+ * Parses address/phone from a Feeding America individual food bank page.
+ * Used only when the listing page is missing that data for an entry.
+ */
+async function fetchFoodBankDetail(
+  slug: string
+): Promise<{ address?: string; city?: string; state?: string; zip?: string; phone?: string }> {
+  try {
+    const html = await fetchHtml(`${FA_BASE}/find-your-local-foodbank/${slug}`);
+    const $ = cheerio.load(html);
+    const result: { address?: string; city?: string; state?: string; zip?: string; phone?: string } = {};
+
+    // Phone: any tel: link
+    const telHref = $("a[href^='tel:']").first().attr("href") || "";
+    if (telHref) result.phone = telHref.replace(/^tel:\+?1?\.?/, "");
+
+    // Address: look for structured address block or text matching US address pattern
+    $("p, address, .address, [class*='address']").each((_, el) => {
+      const text = $(el).text().replace(/\s+/g, " ").trim();
+      const m = text.match(/(.+),\s*([A-Za-z\s]+),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)/);
+      if (m && !result.address) {
+        result.address = m[1].trim();
+        result.city = m[2].trim();
+        result.state = m[3].trim();
+        result.zip = m[4].trim();
+      }
+    });
+
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+async function scrapeFeedingAmerica(): Promise<OfficeScrape[]> {
+  let html: string;
+  try {
+    html = await fetchHtml(FA_LIST_URL);
+  } catch (err) {
+    console.warn(`  [WARN] Feeding America fetch failed (${err}) — using fallback`);
+    return FA_FALLBACK;
+  }
+
+  const $ = cheerio.load(html);
+  const offices: OfficeScrape[] = [];
+
+  // Each food bank entry: anchor containing h3, followed by paragraphs for address+phone and website
+  $('a[href*="/find-your-local-foodbank/"]').each((_, linkEl) => {
+    const $link = $(linkEl);
+    const name = $link.find("h3").first().text().trim();
+    if (!name || name.length < 3) return;
+
+    // Avoid duplicate processing (some pages repeat links)
+    const href = $link.attr("href") || "";
+    const slug = href.replace(/.*\/find-your-local-foodbank\//, "").split("#")[0];
+    if (!slug) return;
+
+    const $container = $link.parent();
+
+    // Address paragraph: first <p> in container, contains text nodes + optional tel: link
+    const $addrPara = $container.find("p").first();
+    const addrTextNodes = $addrPara
+      .contents()
+      .filter((_, n) => n.type === "text")
+      .map((_, n) => ((n as unknown as { data?: string }).data ?? "").replace(/\s+/g, " ").trim())
+      .get()
+      .filter((t: string) => t.length > 2);
+
+    const streetLine = addrTextNodes[0] || "";
+    const cityStateZip = addrTextNodes[1] || "";
+
+    // Parse "City, ST 12345"
+    const cszMatch = cityStateZip.match(/^(.+),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+
+    const phone = $addrPara.find("a[href^='tel:']").first().text().trim();
+
+    // Website: external link in second <p>, or any http link in container not pointing back to feedingamerica.org
+    let website: string | undefined;
+    $container.find("a[href^='//'], a[href^='http']").each((_, a) => {
+      const h = $(a).attr("href") || "";
+      if (!h.includes("feedingamerica.org")) {
+        website = h.startsWith("//") ? `https:${h}` : h;
+        return false; // break
+      }
+    });
+
+    if (!streetLine || !cszMatch) {
+      // Defer to individual page fetch below
+      offices.push({
+        name,
+        address: streetLine || "",
+        city: cszMatch?.[1] || "",
+        state: cszMatch?.[2] || "",
+        zip: cszMatch?.[3] || "",
+        phone: phone || undefined,
+        website,
+        // Store slug temporarily in phone field as a sentinel — resolved below
+      });
+      (offices[offices.length - 1] as OfficeScrape & { _slug?: string })._slug = slug;
+      return;
+    }
+
+    offices.push({
+      name,
+      address: streetLine,
+      city: cszMatch[1].trim(),
+      state: cszMatch[2].trim(),
+      zip: cszMatch[3].trim(),
+      phone: phone || undefined,
+      website,
+    });
+  });
+
+  if (offices.length < 10) {
+    console.warn(
+      `  [WARN] Feeding America: only ${offices.length} parsed from listing — using fallback`
+    );
+    return FA_FALLBACK;
+  }
+
+  // Resolve entries with missing address via individual page fetch
+  const incomplete = offices.filter(o => !o.address || !o.state);
+  if (incomplete.length > 0) {
+    console.log(`  Fetching ${incomplete.length} individual food bank pages for missing data…`);
+    for (const o of incomplete) {
+      const slug = (o as OfficeScrape & { _slug?: string })._slug;
+      if (!slug) continue;
+      const detail = await fetchFoodBankDetail(slug);
+      if (detail.address) o.address = detail.address;
+      if (detail.city) o.city = detail.city;
+      if (detail.state) o.state = detail.state;
+      if (detail.zip) o.zip = detail.zip;
+      if (detail.phone && !o.phone) o.phone = detail.phone;
+      // Small delay to be polite
+      await new Promise(r => setTimeout(r, 300));
+    }
+  }
+
+  // Deduplicate by name+state (as required for food banks — same org can span cities)
+  const seen = new Set<string>();
+  const deduped: OfficeScrape[] = [];
+  for (const o of offices) {
+    const key = `${o.name.toLowerCase()}|${o.state.toLowerCase()}`;
+    if (!seen.has(key) && o.address && o.state) {
+      seen.add(key);
+      deduped.push(o);
+    }
+  }
+
+  console.log(
+    `  Parsed ${offices.length} entries, ${deduped.length} unique by name+state`
+  );
+  return deduped;
+}
+
+// -----------------------------------------------------------------------
 // Org configs
 // -----------------------------------------------------------------------
 
@@ -1033,6 +1368,13 @@ const ORG_CONFIGS: OrgConfig[] = [
     url: "https://www.raicestexas.org/locations/",
     categories: ["legal"],
     scrape: scrapeRAICES,
+  },
+  {
+    label: "Feeding America",
+    url: FA_LIST_URL,
+    categories: ["food"],
+    scrape: scrapeFeedingAmerica,
+    stateLog: true,
   },
 ];
 
@@ -1162,6 +1504,8 @@ Migration file: supabase/migrations/20260329_multi_category_constraint.sql
         lng = coords.lng;
       }
 
+      const isFeedingAmerica = org.label === "Feeding America";
+
       for (const category of org.categories) {
         rows.push({
           name: office.name,
@@ -1175,9 +1519,13 @@ Migration file: supabase/migrations/20260329_multi_category_constraint.sql
           lng,
           phone: office.phone ? normalizePhone(office.phone) : null,
           website: office.website || null,
-          languages: null,
+          hours: isFeedingAmerica
+            ? { note: "Contact local pantry to confirm documentation requirements." }
+            : null,
+          languages: isFeedingAmerica ? ["EN"] : null,
           urgent: false,
           verified: true,
+          documentation_required: isFeedingAmerica ? "unknown" : undefined,
         });
       }
     }
@@ -1191,6 +1539,19 @@ Migration file: supabase/migrations/20260329_multi_category_constraint.sql
       console.log(`  ${org.label} | ${cat}: ${catCounts[cat]} rows`);
     }
     console.log(`  Total rows to upsert: ${rows.length}`);
+
+    // Per-state log (opt-in per org)
+    if (org.stateLog) {
+      const stateCounts: Record<string, number> = {};
+      for (const row of rows) {
+        stateCounts[row.state] = (stateCounts[row.state] ?? 0) + 1;
+      }
+      const statesSorted = Object.keys(stateCounts).sort();
+      console.log(`  Per-state breakdown:`);
+      for (const st of statesSorted) {
+        console.log(`    ${st}: ${stateCounts[st]}`);
+      }
+    }
 
     // Upsert in batches of 50
     const BATCH = 50;
