@@ -150,6 +150,25 @@ function buildResourceGeoJSON(resources: Resource[], activeCategory: ResourceCat
 // Zoom-based fade-in expression: hidden at zoom ≤9, fully visible at zoom ≥10
 const PIN_FADE_IN = ["interpolate", ["linear"], ["zoom"], 9, 0, 10, 1] as mapboxgl.Expression;
 
+/**
+ * Mapbox GL JS forbids ["zoom"] nested inside ["*"] — it must be the direct
+ * input to a top-level interpolate/step.  Instead we recompute the grid
+ * opacity on every zoom event, scaling the density step output by a factor
+ * derived from the current zoom level.
+ *
+ * zoom ≤ 9 → factor 1 (grid fully visible)
+ * zoom 9–10 → linear fade
+ * zoom ≥ 10 → factor 0 (grid invisible, individual pins take over)
+ */
+function updateGridOpacity(m: mapboxgl.Map) {
+  if (!m.getLayer("grid-points")) return;
+  const zoom = m.getZoom();
+  const factor = Math.max(0, Math.min(1, 10 - zoom));
+  m.setPaintProperty("grid-points", "circle-opacity",
+    ["step", ["get", "density"], 0, 0.01, 0.9 * factor],
+  );
+}
+
 /** Add all Mapbox sources and rendering layers to a map instance */
 function setupMapLayers(m: mapboxgl.Map) {
   if (m.getSource("resources")) return; // already set up (e.g. after theme switch)
@@ -178,14 +197,9 @@ function setupMapLayers(m: mapboxgl.Map) {
       ],
       // Fixed 3px — precise pinpoint, not a blob
       "circle-radius": 3,
-      // opacity = density_gate × zoom_fade
-      // density_gate: 0 when density=0, 0.9 otherwise (hides zero-resource areas)
-      // zoom_fade: 1 below zoom 9, linearly fades to 0 by zoom 10
-      "circle-opacity": [
-        "*",
-        ["step", ["get", "density"], 0, 0.01, 0.9],
-        ["interpolate", ["linear"], ["zoom"], 9, 1, 10, 0],
-      ] as mapboxgl.Expression,
+      // Base data-driven opacity: 0 for zero-density, 0.9 otherwise.
+      // Zoom crossfade (9→10) is applied dynamically via updateGridOpacity().
+      "circle-opacity": ["step", ["get", "density"], 0, 0.01, 0.9],
     },
   });
 
@@ -362,9 +376,15 @@ export function MapView({
     map.current.on("load", () => {
       console.log("[MapView] map loaded, setting up layers");
       setupMapLayers(map.current!);
+      updateGridOpacity(map.current!); // set correct opacity for initial zoom
       map.current!.resize();
       setMapLoaded(true);
       map.current!.getCanvas().style.cursor = "pointer";
+    });
+
+    // Smooth zoom crossfade: grid fades out 9→10, pins fade in (via PIN_FADE_IN expression)
+    map.current.on("zoom", () => {
+      if (map.current) updateGridOpacity(map.current);
     });
 
     map.current.on("moveend", () => {
@@ -452,6 +472,7 @@ export function MapView({
     map.current.once("idle", () => {
       if (!map.current) return;
       setupMapLayers(map.current);
+      updateGridOpacity(map.current);
       const resSrc = map.current.getSource("resources") as mapboxgl.GeoJSONSource | undefined;
       resSrc?.setData(buildResourceGeoJSON(resources, activeCategory));
       const gridSrc = map.current.getSource("grid-heatmap") as mapboxgl.GeoJSONSource | undefined;
