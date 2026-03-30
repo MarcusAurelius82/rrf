@@ -1,7 +1,17 @@
 "use client";
+import { useState } from "react";
 import { Resource } from "@/types";
 import { ResourceCard } from "@/components/ui/ResourceCard";
 import { SearchInput } from "@/components/ui/SearchInput";
+import { cn } from "@/lib/utils";
+
+type DocFilter = "all" | "none" | "id_only";
+
+const DOC_FILTER_LABELS: Record<DocFilter, string> = {
+  all:     "ALL RESOURCES",
+  none:    "NO DOCS REQUIRED",
+  id_only: "ID ONLY",
+};
 
 interface ResourcePanelProps {
   resources: Resource[];
@@ -24,7 +34,13 @@ export function ResourcePanel({
   onSearchChange,
   onClose,
 }: ResourcePanelProps) {
-  const urgentCount = resources.filter(r => r.urgent).length;
+  const [docFilter, setDocFilter] = useState<DocFilter>("all");
+
+  const filteredResources = docFilter === "all"
+    ? resources
+    : resources.filter(r => r.documentation_required === docFilter);
+
+  const urgentCount = filteredResources.filter(r => r.urgent).length;
 
   return (
     <section
@@ -61,6 +77,24 @@ export function ResourcePanel({
           aiEnabled
           placeholder="Search resources… (AI-powered)"
         />
+        {/* Documentation filter */}
+        <div className="mt-2.5 flex gap-1" role="group" aria-label="Filter by documentation requirement">
+          {(["all", "none", "id_only"] as DocFilter[]).map(f => (
+            <button
+              key={f}
+              onClick={() => setDocFilter(f)}
+              aria-pressed={docFilter === f}
+              className={cn(
+                "flex-1 py-1 rounded font-mono text-[7px] font-bold tracking-[0.08em] border transition-all",
+                docFilter === f
+                  ? "bg-accent border-accent text-white"
+                  : "bg-transparent border-border text-content-muted hover:border-border-active hover:text-content-secondary"
+              )}
+            >
+              {DOC_FILTER_LABELS[f]}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* AI Summary */}
@@ -79,10 +113,10 @@ export function ResourcePanel({
       )}
 
       {/* Resource count */}
-      {!isLoading && resources.length > 0 && (
+      {!isLoading && filteredResources.length > 0 && (
         <div className="px-4 pt-3 pb-0 flex-shrink-0">
           <div className="font-mono text-[9px] text-content-muted tracking-[0.1em]" aria-live="polite">
-            {resources.length} RESULT{resources.length !== 1 ? "S" : ""}
+            {filteredResources.length} RESULT{filteredResources.length !== 1 ? "S" : ""}
           </div>
         </div>
       )}
@@ -91,15 +125,15 @@ export function ResourcePanel({
       <div
         className="flex-1 overflow-y-auto p-3 flex flex-col gap-2"
         role="list"
-        aria-label={`${resources.length} resources found`}
+        aria-label={`${filteredResources.length} resources found`}
         aria-busy={isLoading}
       >
         {isLoading ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-2 text-content-muted" aria-live="polite">
             <div className="font-mono text-[11px] tracking-[0.1em] animate-pulse">LOADING...</div>
           </div>
-        ) : resources.length > 0 ? (
-          resources.map(r => (
+        ) : filteredResources.length > 0 ? (
+          filteredResources.map(r => (
             <div key={r.id} role="listitem">
               <ResourceCard resource={r} />
             </div>

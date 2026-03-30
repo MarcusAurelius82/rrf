@@ -1,8 +1,16 @@
 "use client";
-import { Resource } from "@/types";
+import { DocumentationRequired, Resource } from "@/types";
 import { CATEGORY_CONFIG } from "@/lib/utils";
 import { StatusBadge } from "./StatusBadge";
 import { cn } from "@/lib/utils";
+
+const DOC_BADGE: Record<DocumentationRequired, { label: string; className: string }> = {
+  none:              { label: "NO DOCS REQUIRED",           className: "text-green-400 bg-green-500/10 border-green-500/20" },
+  id_only:           { label: "ID ONLY",                    className: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
+  legal_status:      { label: "LEGAL STATUS REQUIRED",      className: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20" },
+  benefits_eligible: { label: "PROGRAM ELIGIBILITY REQUIRED", className: "text-orange-400 bg-orange-500/10 border-orange-500/20" },
+  unknown:           { label: "⚠ CALL AHEAD — CONFIRM ELIGIBILITY", className: "text-content-muted bg-border/30 border-border" },
+};
 
 interface ResourceCardProps {
   resource: Resource;
@@ -50,6 +58,14 @@ export function ResourceCard({ resource: r, compact }: ResourceCardProps) {
         {r.urgent && (
           <span className="inline-block font-mono text-[8px] font-bold tracking-[0.1em] px-2 py-0.5 rounded text-red-400 bg-red-500/10 border border-red-500/20">
             URGENT
+          </span>
+        )}
+        {r.documentation_required && (
+          <span className={cn(
+            "inline-block font-mono text-[8px] font-bold tracking-[0.1em] px-2 py-0.5 rounded border",
+            DOC_BADGE[r.documentation_required].className
+          )}>
+            {DOC_BADGE[r.documentation_required].label}
           </span>
         )}
       </div>
