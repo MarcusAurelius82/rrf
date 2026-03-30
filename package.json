@@ -12,7 +12,8 @@
     "seed:data": "tsx scripts/seed-data.ts",
     "seed:211": "tsx scripts/seed-211.ts",
     "seed:orgs": "tsx scripts/seed-organizations.ts",
-    "seed:irc": "tsx scripts/seed-irc.ts"
+    "seed:irc": "tsx scripts/seed-irc.ts",
+    "seed:snap": "tsx scripts/seed-snap.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.0",
