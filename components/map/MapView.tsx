@@ -164,10 +164,8 @@ function updateGridOpacity(m: mapboxgl.Map) {
   if (!m.getLayer("grid-points")) return;
   const zoom = m.getZoom();
   const factor = Math.max(0, Math.min(1, 10 - zoom));
-  // density=0 → faint base (grid always visible across US)
-  // density>0.01 → full brightness, scaled by zoom crossfade factor
   m.setPaintProperty("grid-points", "circle-opacity",
-    ["step", ["get", "density"], 0.18 * factor, 0.01, 0.9 * factor],
+    ["step", ["get", "density"], 0.5 * factor, 0.01, 0.9 * factor],
   );
 }
 
@@ -187,21 +185,19 @@ function setupMapLayers(m: mapboxgl.Map) {
     type: "circle",
     source: "grid-heatmap",
     paint: {
-      // Color ramp: dim blue-grey (grid always visible) → dark blue → accent blue → bright blue → white
+      // Color ramp: dark blue at 0 density (grid visible on startup) → accent → bright → white
       "circle-color": [
         "interpolate", ["linear"], ["get", "density"],
-        0.00, "#1e2533",
-        0.01, "#1e2a3a",
-        0.15, "#1e3a8a",
+        0.00, "#1e3a8a",
         0.40, "#2563eb",
         0.70, "#60a5fa",
         1.00, "#ffffff",
       ],
       // Fixed 3px — precise pinpoint, not a blob
       "circle-radius": 3,
-      // Base data-driven opacity: faint for zero-density (grid always visible), 0.9 for populated areas.
+      // Base data-driven opacity: 0.5 for zero-density (grid visible on startup), 0.9 for populated areas.
       // Zoom crossfade (9→10) is applied dynamically via updateGridOpacity().
-      "circle-opacity": ["step", ["get", "density"], 0.18, 0.01, 0.9],
+      "circle-opacity": ["step", ["get", "density"], 0.5, 0.01, 0.9],
     },
   });
 
