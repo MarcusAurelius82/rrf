@@ -424,7 +424,7 @@ export function MapView({
       // ── Initialize Deck.gl overlay ──────────────────────────────────────
       try {
         const { MapboxOverlay } = await import("@deck.gl/mapbox");
-        const overlay = new MapboxOverlay({ interleaved: true, layers: [] });
+        const overlay = new MapboxOverlay({ layers: [] });
         map.current!.addControl(overlay as unknown as mapboxgl.IControl);
         overlayRef.current = overlay;
         console.log("[MapView] Deck.gl MapboxOverlay initialized");
