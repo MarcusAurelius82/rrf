@@ -2,6 +2,8 @@
 import { useRef, useEffect, useState, useMemo, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import { ColumnLayer } from "@deck.gl/layers";
+import { MapboxOverlay } from "@deck.gl/mapbox";
 import { Resource, ResourceCategory } from "@/types";
 import { CATEGORY_CONFIG } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
@@ -349,7 +351,6 @@ export function MapView({
     (data: ColumnDatum[], elevationScale = 1) => {
       // Dynamically imported to avoid SSR issues
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { ColumnLayer } = require("@deck.gl/layers") as any;
       return new ColumnLayer({
         id: "resource-columns",
         data,
@@ -364,16 +365,18 @@ export function MapView({
         pickable: true,
         autoHighlight: true,
         highlightColor: [255, 255, 255, 60],
-        onHover: ({ object, x, y }: { object: ColumnDatum | null; x: number; y: number }) => {
+        onHover: (info: { object?: ColumnDatum | null; x: number; y: number }) => {
+          const object = info.object ?? null;
           if (object && object.count > 0) {
-            setTooltip({ x, y, datum: object });
+            setTooltip({ x: info.x, y: info.y, datum: object });
             if (map.current) map.current.getCanvas().style.cursor = "pointer";
           } else {
             setTooltip(null);
             if (map.current) map.current.getCanvas().style.cursor = "grab";
           }
         },
-        onClick: ({ object }: { object: ColumnDatum | null }) => {
+        onClick: (info: { object?: ColumnDatum | null }) => {
+          const object = info.object ?? null;
           if (!object || object.count === 0 || !map.current) return;
           map.current.flyTo({
             center: object.position,
@@ -423,7 +426,6 @@ export function MapView({
 
       // ── Initialize Deck.gl overlay ──────────────────────────────────────
       try {
-        const { MapboxOverlay } = await import("@deck.gl/mapbox");
         const overlay = new MapboxOverlay({ layers: [] });
         map.current!.addControl(overlay as unknown as mapboxgl.IControl);
         overlayRef.current = overlay;
