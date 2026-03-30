@@ -1,10 +1,11 @@
 "use client";
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useMemo, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { Resource, ResourceCategory } from "@/types";
 import { CATEGORY_CONFIG } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
+import { generateUSGrid, calculateColumnData, ColumnDatum } from "@/lib/mapbox";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
 
@@ -55,6 +56,7 @@ interface MapViewProps {
   activeCategory: ResourceCategory | null;
   onMobileSidebarToggle?: () => void;
   onMobilePanelToggle?: () => void;
+  onColumnClick?: (position: [number, number]) => void;
 }
 
 const STATE_CENTROIDS: Record<string, [number, number]> = {
@@ -246,6 +248,64 @@ function setupMapLayers(m: mapboxgl.Map) {
   });
 }
 
+// ── Tooltip state ─────────────────────────────────────────────────────────────
+interface TooltipState {
+  x: number;
+  y: number;
+  datum: ColumnDatum;
+}
+
+function ColumnTooltip({ tooltip }: { tooltip: TooltipState }) {
+  const { datum } = tooltip;
+  const categoryOrder: ResourceCategory[] = ["shelter", "food", "legal", "medical", "language"];
+  const maxCount = Math.max(...Object.values(datum.categoryCounts));
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        left: tooltip.x + 12,
+        top: tooltip.y - 10,
+        pointerEvents: "none",
+        zIndex: 1000,
+        fontFamily: "'IBM Plex Mono', monospace",
+        background: "#1a1a1a",
+        border: "1px solid rgba(255,255,255,0.1)",
+        borderRadius: 6,
+        padding: "10px 12px",
+        minWidth: 180,
+      }}
+    >
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", letterSpacing: "0.08em", marginBottom: 8 }}>
+        {datum.count} {datum.count === 1 ? "RESOURCE" : "RESOURCES"}
+      </div>
+      {categoryOrder.map(cat => {
+        const count = datum.categoryCounts[cat];
+        if (!count) return null;
+        const cfg = CATEGORY_CONFIG[cat];
+        const barWidth = Math.round((count / maxCount) * 60);
+        return (
+          <div key={cat} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+            <div style={{ width: 8, height: 8, borderRadius: 2, background: cfg.color, flexShrink: 0 }} />
+            <div style={{ fontSize: 9, color: cfg.color, letterSpacing: "0.08em", width: 62, flexShrink: 0 }}>
+              {cfg.label}
+            </div>
+            <div style={{
+              height: 6,
+              width: barWidth,
+              background: cfg.color,
+              borderRadius: 2,
+              opacity: 0.7,
+              flexShrink: 0,
+            }} />
+            <div style={{ fontSize: 9, color: "#888", marginLeft: 2 }}>{count}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function MapView({
   resources,
   selectedState,
@@ -253,6 +313,7 @@ export function MapView({
   activeCategory,
   onMobileSidebarToggle,
   onMobilePanelToggle,
+  onColumnClick,
 }: MapViewProps) {
   const { theme } = useTheme();
   const mapContainer   = useRef<HTMLDivElement>(null);
@@ -260,11 +321,81 @@ export function MapView({
   const popupRef       = useRef<mapboxgl.Popup | null>(null);
   const geocodingRef   = useRef(false);
   const onSelectRef    = useRef(onSelectState);
-  onSelectRef.current  = onSelectState; // always latest without re-init
+  onSelectRef.current  = onSelectState;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const overlayRef     = useRef<any>(null);
+  const onColumnClickRef = useRef(onColumnClick);
+  onColumnClickRef.current = onColumnClick;
 
   const [mapLoaded, setMapLoaded] = useState(false);
   const [clicking, setClicking]   = useState(false);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 37.09, lng: -95.71 });
+  const [tooltip, setTooltip]     = useState<TooltipState | null>(null);
+
+  // ── Memoize grid (constant) ──────────────────────────────────────────────
+  const grid = useMemo(() => generateUSGrid(), []);
+
+  // ── Memoize column data (recomputes when resources or category changes) ──
+  const columnData = useMemo(() => {
+    if (resources.length === 0) return [];
+    const filtered = activeCategory
+      ? resources.filter(r => r.category === activeCategory)
+      : resources;
+    return calculateColumnData(grid, filtered, 1.2);
+  }, [grid, resources, activeCategory]);
+
+  // ── Build ColumnLayer props helper ───────────────────────────────────────
+  const buildColumnLayer = useCallback(
+    (data: ColumnDatum[], elevationScale = 1) => {
+      // Dynamically imported to avoid SSR issues
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { ColumnLayer } = require("@deck.gl/layers") as any;
+      return new ColumnLayer({
+        id: "resource-columns",
+        data,
+        diskResolution: 12,
+        radius: 18000,
+        extruded: true,
+        getPosition: (d: ColumnDatum) => d.position,
+        getElevation: (d: ColumnDatum) => d.elevation,
+        getFillColor: (d: ColumnDatum) => d.color,
+        getLineColor: [0, 0, 0, 0],
+        elevationScale,
+        pickable: true,
+        autoHighlight: true,
+        highlightColor: [255, 255, 255, 60],
+        onHover: ({ object, x, y }: { object: ColumnDatum | null; x: number; y: number }) => {
+          if (object && object.count > 0) {
+            setTooltip({ x, y, datum: object });
+            if (map.current) map.current.getCanvas().style.cursor = "pointer";
+          } else {
+            setTooltip(null);
+            if (map.current) map.current.getCanvas().style.cursor = "grab";
+          }
+        },
+        onClick: ({ object }: { object: ColumnDatum | null }) => {
+          if (!object || object.count === 0 || !map.current) return;
+          map.current.flyTo({
+            center: object.position,
+            zoom: 8,
+            pitch: 45,
+            duration: 800,
+          });
+          onColumnClickRef.current?.(object.position);
+          // Reverse geocode to select the state
+          reverseGeocodeState(object.position[0], object.position[1]).then(code => {
+            if (code) onSelectRef.current(code);
+          });
+        },
+        updateTriggers: {
+          getElevation: [resources, activeCategory],
+          getFillColor: [resources, activeCategory],
+        },
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [resources, activeCategory]
+  );
 
   // ── Init map ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -273,21 +404,33 @@ export function MapView({
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style:     MAP_STYLES[theme],
-      center:    [-95.7, 37.1],
-      zoom:      3.8,
+      center:    [-95.7, 37.5],
+      zoom:      4.0,
+      pitch:     45,
+      bearing:   -10,
       minZoom:   2,
       maxZoom:   14,
     });
 
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
 
-    map.current.on("load", () => {
+    map.current.on("load", async () => {
       console.log("[MapView] map loaded, setting up layers");
       setupMapLayers(map.current!);
-      // Ensure canvas matches container dimensions (flex layout may not be settled yet)
       map.current!.resize();
       setMapLoaded(true);
-      map.current!.getCanvas().style.cursor = "pointer";
+      map.current!.getCanvas().style.cursor = "grab";
+
+      // ── Initialize Deck.gl overlay ──────────────────────────────────────
+      try {
+        const { MapboxOverlay } = await import("@deck.gl/mapbox");
+        const overlay = new MapboxOverlay({ interleaved: true, layers: [] });
+        map.current!.addControl(overlay as unknown as mapboxgl.IControl);
+        overlayRef.current = overlay;
+        console.log("[MapView] Deck.gl MapboxOverlay initialized");
+      } catch (err) {
+        console.error("[MapView] Failed to init Deck.gl overlay:", err);
+      }
     });
 
     map.current.on("moveend", () => {
@@ -296,7 +439,28 @@ export function MapView({
       setMapCenter({ lat: c.lat, lng: c.lng });
     });
 
-    // Click map → reverse-geocode → select state
+    // Zoom transition: columns ↔ pins + pitch transition
+    map.current.on("zoom", () => {
+      if (!map.current || !overlayRef.current) return;
+      const zoom = map.current.getZoom();
+
+      // Column elevation scale: 1 at zoom<9, fade 9→10, 0 at zoom>10
+      const scale = zoom < 9 ? 1 : zoom > 10 ? 0 : 10 - zoom;
+
+      overlayRef.current.setProps({
+        layers: [buildColumnLayer(columnData, scale)],
+      });
+
+      // Pitch: 45° when zoomed out, 0° when zoomed in
+      const pitch = map.current.getPitch();
+      if (zoom > 9.5 && pitch > 0) {
+        map.current.easeTo({ pitch: 0, duration: 600 });
+      } else if (zoom < 8.5 && pitch < 45) {
+        map.current.easeTo({ pitch: 45, duration: 600 });
+      }
+    });
+
+    // Click map → reverse-geocode → select state (only at low zoom, columns handle high-zoom)
     map.current.on("click", async (e) => {
       if (geocodingRef.current) return;
       const { lng, lat } = e.lngLat;
@@ -328,6 +492,16 @@ export function MapView({
     console.log(`[MapView] setData: ${resources.length} resources → ${geojson.features.length} features`);
     source.setData(geojson);
   }, [resources, activeCategory, mapLoaded]);
+
+  // ── Update Deck.gl column layer when data changes ─────────────────────────
+  useEffect(() => {
+    if (!overlayRef.current) return;
+    const zoom = map.current?.getZoom() ?? 4;
+    const scale = zoom < 9 ? 1 : zoom > 10 ? 0 : 10 - zoom;
+    overlayRef.current.setProps({
+      layers: [buildColumnLayer(columnData, scale)],
+    });
+  }, [columnData, buildColumnLayer]);
 
   // ── Pin click handler — needs fresh `resources` for popup content ─────────
   useEffect(() => {
@@ -413,7 +587,7 @@ export function MapView({
       {!selectedState && mapLoaded && (
         <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
           <div className="font-mono text-[10px] text-content-secondary bg-surface-0/80 border border-border px-3 py-1.5 rounded-full backdrop-blur-sm tracking-[0.08em] whitespace-nowrap">
-            {clicking ? "LOCATING…" : "CLICK ANY STATE TO LOAD RESOURCES"}
+            {clicking ? "LOCATING…" : "CLICK A COLUMN OR STATE TO LOAD RESOURCES"}
           </div>
         </div>
       )}
@@ -452,6 +626,9 @@ export function MapView({
       {/* Map container */}
       <div ref={mapContainer} className="w-full h-full" aria-hidden="true" />
 
+      {/* Deck.gl column tooltip */}
+      {tooltip && <ColumnTooltip tooltip={tooltip} />}
+
       {/* Status bar */}
       <div
         className="absolute bottom-0 left-0 right-0 h-9 flex items-center gap-4 md:gap-6 px-3 md:px-4 border-t border-border bg-surface-0/90 backdrop-blur-sm font-mono text-[10px] text-content-muted tracking-[0.08em]"
@@ -460,7 +637,10 @@ export function MapView({
         <span>LAT <span className="text-content-secondary">{latStr}</span></span>
         <span>LON <span className="text-content-secondary">{lngStr}</span></span>
         {selectedState && <span className="hidden sm:inline">SELECTED <span className="text-content-secondary">{selectedState}</span></span>}
-        <span className="ml-auto">STATUS <span className="text-accent">LIVE</span></span>
+        <span className="ml-auto hidden md:inline">
+          COLUMNS <span className="text-accent">{columnData.length}</span>
+        </span>
+        <span>STATUS <span className="text-accent">LIVE</span></span>
       </div>
     </div>
   );
