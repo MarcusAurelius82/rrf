@@ -1,10 +1,11 @@
 "use client";
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useMemo } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { Resource, ResourceCategory } from "@/types";
 import { CATEGORY_CONFIG } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
+import { generateUSGrid, calculateGridDensity } from "@/lib/mapbox";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
 
@@ -146,10 +147,49 @@ function buildResourceGeoJSON(resources: Resource[], activeCategory: ResourceCat
   return { type: "FeatureCollection" as const, features };
 }
 
-/** Add the resource source and all rendering layers to a map instance */
+// Zoom-based fade-in expression: hidden at zoom ≤9, fully visible at zoom ≥10
+const PIN_FADE_IN = ["interpolate", ["linear"], ["zoom"], 9, 0, 10, 1] as mapboxgl.Expression;
+
+/** Add all Mapbox sources and rendering layers to a map instance */
 function setupMapLayers(m: mapboxgl.Map) {
   if (m.getSource("resources")) return; // already set up (e.g. after theme switch)
 
+  // ── Grid heatmap — added first so it renders below pins ────────────────────
+  m.addSource("grid-heatmap", {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] },
+  });
+
+  // Pinpoint grid: density-colored 3px dots, fade out as zoom crosses 9→10
+  m.addLayer({
+    id: "grid-points",
+    type: "circle",
+    source: "grid-heatmap",
+    paint: {
+      // Color ramp: charcoal (invisible) → dim blue-grey → dark blue → accent blue → bright blue → white
+      "circle-color": [
+        "interpolate", ["linear"], ["get", "density"],
+        0.00, "#1a1a1a",
+        0.01, "#1e2a3a",
+        0.15, "#1e3a8a",
+        0.40, "#2563eb",
+        0.70, "#60a5fa",
+        1.00, "#ffffff",
+      ],
+      // Fixed 3px — precise pinpoint, not a blob
+      "circle-radius": 3,
+      // opacity = density_gate × zoom_fade
+      // density_gate: 0 when density=0, 0.9 otherwise (hides zero-resource areas)
+      // zoom_fade: 1 below zoom 9, linearly fades to 0 by zoom 10
+      "circle-opacity": [
+        "*",
+        ["step", ["get", "density"], 0, 0.01, 0.9],
+        ["interpolate", ["linear"], ["zoom"], 9, 1, 10, 0],
+      ] as mapboxgl.Expression,
+    },
+  });
+
+  // ── Resource clustering source ─────────────────────────────────────────────
   m.addSource("resources", {
     type: "geojson",
     data: { type: "FeatureCollection", features: [] },
@@ -158,7 +198,7 @@ function setupMapLayers(m: mapboxgl.Map) {
     clusterRadius: 40,
   });
 
-  // Cluster bubble
+  // Cluster bubble — fades in zoom 9→10
   m.addLayer({
     id: "clusters",
     type: "circle",
@@ -169,6 +209,8 @@ function setupMapLayers(m: mapboxgl.Map) {
       "circle-radius": ["step", ["get", "point_count"], 14, 10, 18, 100, 22],
       "circle-stroke-width": 1.5,
       "circle-stroke-color": "rgba(255,255,255,0.25)",
+      "circle-opacity": PIN_FADE_IN,
+      "circle-stroke-opacity": PIN_FADE_IN,
     },
   });
 
@@ -183,10 +225,13 @@ function setupMapLayers(m: mapboxgl.Map) {
       "text-size": 11,
       "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
     },
-    paint: { "text-color": "#ffffff" },
+    paint: {
+      "text-color": "#ffffff",
+      "text-opacity": PIN_FADE_IN,
+    },
   });
 
-  // Individual pins — color by category
+  // Individual pins — color by category, fades in zoom 9→10
   m.addLayer({
     id: "resource-pins",
     type: "circle",
@@ -205,6 +250,8 @@ function setupMapLayers(m: mapboxgl.Map) {
       "circle-radius": 7,
       "circle-stroke-width": 1.5,
       "circle-stroke-color": "rgba(255,255,255,0.25)",
+      "circle-opacity": PIN_FADE_IN,
+      "circle-stroke-opacity": PIN_FADE_IN,
     },
   });
 
@@ -219,6 +266,7 @@ function setupMapLayers(m: mapboxgl.Map) {
       "circle-radius": 10,
       "circle-stroke-width": 2,
       "circle-stroke-color": "#ef4444",
+      "circle-stroke-opacity": PIN_FADE_IN,
     },
   });
 
@@ -260,11 +308,41 @@ export function MapView({
   const popupRef       = useRef<mapboxgl.Popup | null>(null);
   const geocodingRef   = useRef(false);
   const onSelectRef    = useRef(onSelectState);
-  onSelectRef.current  = onSelectState; // always latest without re-init
+  onSelectRef.current  = onSelectState;
 
   const [mapLoaded, setMapLoaded] = useState(false);
   const [clicking, setClicking]   = useState(false);
-  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 37.09, lng: -95.71 });
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 37.5, lng: -95.7 });
+
+  // ── Grid generation — once on mount ──────────────────────────────────────
+  const grid = useMemo(() => {
+    const t0 = performance.now();
+    const pts = generateUSGrid(0.8);
+    console.log(`[MapView] Grid: ${pts.length} points generated in ${(performance.now() - t0).toFixed(1)}ms`);
+    return pts;
+  }, []);
+
+  // ── Grid density — recompute when resources or active category changes ────
+  const gridGeoJSON = useMemo(() => {
+    const t0 = performance.now();
+    const filtered = activeCategory
+      ? resources.filter(r => r.category === activeCategory)
+      : resources;
+    const { densities, counts } = calculateGridDensity(grid, filtered, 1.2);
+    console.log(`[MapView] Grid density: ${(performance.now() - t0).toFixed(1)}ms (${filtered.length} resources, ${grid.length} points)`);
+    return {
+      type: "FeatureCollection" as const,
+      features: grid.map((pt, i) => ({
+        type: "Feature" as const,
+        geometry: { type: "Point" as const, coordinates: pt },
+        properties: { density: densities[i], count: counts[i] },
+      })),
+    };
+  }, [grid, resources, activeCategory]);
+
+  // Keep a ref so theme-switch closure always has the latest GeoJSON
+  const gridGeoJSONRef = useRef(gridGeoJSON);
+  gridGeoJSONRef.current = gridGeoJSON;
 
   // ── Init map ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -273,8 +351,8 @@ export function MapView({
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style:     MAP_STYLES[theme],
-      center:    [-95.7, 37.1],
-      zoom:      3.8,
+      center:    [-95.7, 37.5],
+      zoom:      4.2,
       minZoom:   2,
       maxZoom:   14,
     });
@@ -284,7 +362,6 @@ export function MapView({
     map.current.on("load", () => {
       console.log("[MapView] map loaded, setting up layers");
       setupMapLayers(map.current!);
-      // Ensure canvas matches container dimensions (flex layout may not be settled yet)
       map.current!.resize();
       setMapLoaded(true);
       map.current!.getCanvas().style.cursor = "pointer";
@@ -319,7 +396,15 @@ export function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Update GeoJSON data when resources / category change ─────────────────
+  // ── Update grid heatmap when density changes ──────────────────────────────
+  useEffect(() => {
+    if (!mapLoaded || !map.current) return;
+    const src = map.current.getSource("grid-heatmap") as mapboxgl.GeoJSONSource | undefined;
+    if (!src) return;
+    src.setData(gridGeoJSON);
+  }, [gridGeoJSON, mapLoaded]);
+
+  // ── Update resource GeoJSON when resources / category change ─────────────
   useEffect(() => {
     if (!mapLoaded || !map.current) return;
     const source = map.current.getSource("resources") as mapboxgl.GeoJSONSource | undefined;
@@ -367,8 +452,10 @@ export function MapView({
     map.current.once("idle", () => {
       if (!map.current) return;
       setupMapLayers(map.current);
-      const source = map.current.getSource("resources") as mapboxgl.GeoJSONSource | undefined;
-      source?.setData(buildResourceGeoJSON(resources, activeCategory));
+      const resSrc = map.current.getSource("resources") as mapboxgl.GeoJSONSource | undefined;
+      resSrc?.setData(buildResourceGeoJSON(resources, activeCategory));
+      const gridSrc = map.current.getSource("grid-heatmap") as mapboxgl.GeoJSONSource | undefined;
+      gridSrc?.setData(gridGeoJSONRef.current);
     });
     map.current.setStyle(MAP_STYLES[theme]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
