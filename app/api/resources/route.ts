@@ -30,9 +30,10 @@ export async function GET(request: NextRequest) {
       if (error) throw error;
       data = rows ?? [];
     } else {
-      // No category filter — cap each category at 20 to balance the map
+      // No category filter — cap each category to balance the map.
+      // Higher cap for national view (no state) so clusters are meaningful.
       const CATEGORIES = ["medical", "shelter", "food", "legal", "language"] as const;
-      const CAP = 20;
+      const CAP = state ? 20 : 50;
 
       const results = await Promise.all(
         CATEGORIES.map(cat => {
