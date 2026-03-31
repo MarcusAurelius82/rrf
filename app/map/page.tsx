@@ -34,11 +34,11 @@ export default function MapPage() {
     return () => document.body.classList.remove("drawer-open");
   }, [mobileSidebarOpen, mobilePanelOpen, reportModalOpen]);
 
-  // Fetch resources when state/category changes
+  // Fetch resources on mount and when state/category changes
   useEffect(() => {
-    if (!selectedState) return;
     setIsLoading(true);
-    const params = new URLSearchParams({ state: selectedState });
+    const params = new URLSearchParams();
+    if (selectedState) params.set("state", selectedState);
     if (activeCategory) params.set("category", activeCategory);
 
     fetch(`/api/resources?${params}`)
