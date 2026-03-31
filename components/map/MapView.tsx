@@ -319,14 +319,6 @@ export function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Update grid heatmap when density changes ──────────────────────────────
-  useEffect(() => {
-    if (!mapLoaded || !map.current) return;
-    const src = map.current.getSource("grid-heatmap") as mapboxgl.GeoJSONSource | undefined;
-    if (!src) return;
-    src.setData(gridGeoJSON);
-  }, [gridGeoJSON, mapLoaded]);
-
   // ── Update resource GeoJSON when resources / category / theme change ────────
   useEffect(() => {
     if (!mapLoaded || !map.current) return;
