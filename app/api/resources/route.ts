@@ -10,23 +10,46 @@ export async function GET(request: NextRequest) {
     const urgentOnly = searchParams.get("urgent_only") === "true";
 
     const supabase = createAdminClient();
-    let query = supabase.from("resources").select("*").eq("verified", true);
 
-    if (state) query = query.eq("state", state);
-    if (category) query = query.eq("category", category);
-    if (urgentOnly) query = query.eq("urgent", true);
+    const baseQuery = () =>
+      supabase.from("resources").select("*")
+        .eq("verified", true)
+        .gte("lat", 24).lte("lat", 49)
+        .gte("lng", -125).lte("lng", -66)
+        .order("urgent", { ascending: false })
+        .order("name");
 
-    // Exclude records with missing or out-of-US-bounds coordinates
-    query = query
-      .gte("lat", 24).lte("lat", 49)
-      .gte("lng", -125).lte("lng", -66);
+    let data: Resource[];
 
-    query = query.order("urgent", { ascending: false }).order("name");
+    if (category) {
+      // Single-category request — return all matching records
+      let q = baseQuery().eq("category", category);
+      if (state) q = q.eq("state", state);
+      if (urgentOnly) q = q.eq("urgent", true);
+      const { data: rows, error } = await q;
+      if (error) throw error;
+      data = rows ?? [];
+    } else {
+      // No category filter — cap each category at 20 to balance the map
+      const CATEGORIES = ["medical", "shelter", "food", "legal", "language"] as const;
+      const CAP = 20;
 
-    const { data, error } = await query;
-    if (error) throw error;
+      const results = await Promise.all(
+        CATEGORIES.map(cat => {
+          let q = baseQuery().eq("category", cat).limit(CAP);
+          if (state) q = q.eq("state", state);
+          if (urgentOnly) q = q.eq("urgent", true);
+          return q;
+        })
+      );
 
-    return NextResponse.json<ApiResponse<Resource[]>>({ data: data ?? [] });
+      const firstError = results.find(r => r.error)?.error;
+      if (firstError) throw firstError;
+
+      data = results.flatMap(r => r.data ?? []);
+    }
+
+    return NextResponse.json<ApiResponse<Resource[]>>({ data });
   } catch (err) {
     console.error(err);
     return NextResponse.json<ApiResponse<never>>({ error: "Failed to fetch resources" }, { status: 500 });
