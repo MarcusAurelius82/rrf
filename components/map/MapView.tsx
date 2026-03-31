@@ -412,7 +412,7 @@ export function MapView({
     const coord = getSafeResourceCoord(resource);
     if (!coord) return;
     const zoom = map.current.getZoom();
-    if (zoom < 8 || !map.current.getBounds().contains(coord as mapboxgl.LngLatLike)) {
+    if (zoom < 8 || !map.current.getBounds()?.contains(coord as mapboxgl.LngLatLike)) {
       map.current.flyTo({ center: coord, zoom: Math.max(zoom, 10), duration: 800 });
     }
   }, [selectedResourceId, mapLoaded, resources]);
