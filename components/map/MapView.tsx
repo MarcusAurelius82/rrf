@@ -55,6 +55,8 @@ interface MapViewProps {
   activeCategory: ResourceCategory | null;
   onMobileSidebarToggle?: () => void;
   onMobilePanelToggle?: () => void;
+  selectedResourceId?: string | null;
+  onSelectResource?: (id: string | null) => void;
 }
 
 const STATE_CENTROIDS: Record<string, [number, number]> = {
@@ -137,6 +139,7 @@ function buildResourceGeoJSON(resources: Resource[], activeCategory: ResourceCat
       geometry: { type: "Point", coordinates: coord },
       properties: {
         ids: JSON.stringify(group.map(r => r.id)),
+        primary_id: primary.id,
         category: primary.category,
         urgent: group.some(r => r.urgent),
       },
@@ -222,6 +225,20 @@ function setupMapLayers(m: mapboxgl.Map) {
     },
   });
 
+  // Selected pin ring — white glow around the active pin
+  m.addLayer({
+    id: "selected-pin-ring",
+    type: "circle",
+    source: "resources",
+    filter: ["==", ["get", "primary_id"], "__none__"],
+    paint: {
+      "circle-color": "transparent",
+      "circle-radius": 13,
+      "circle-stroke-width": 2.5,
+      "circle-stroke-color": "#ffffff",
+    },
+  });
+
   // Pointer cursor
   const setCursor = (cur: string) => () => { m.getCanvas().style.cursor = cur; };
   m.on("mouseenter", "clusters",      setCursor("pointer"));
@@ -253,6 +270,8 @@ export function MapView({
   activeCategory,
   onMobileSidebarToggle,
   onMobilePanelToggle,
+  selectedResourceId,
+  onSelectResource,
 }: MapViewProps) {
   const { theme } = useTheme();
   const mapContainer   = useRef<HTMLDivElement>(null);
@@ -267,10 +286,12 @@ export function MapView({
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 37.09, lng: -95.71 });
 
   // Refs so async callbacks (style.load, idle) always see the latest props
-  const resourcesRef      = useRef(resources);
-  const activeCategoryRef = useRef(activeCategory);
-  resourcesRef.current      = resources;
-  activeCategoryRef.current = activeCategory;
+  const resourcesRef           = useRef(resources);
+  const activeCategoryRef      = useRef(activeCategory);
+  const selectedResourceIdRef  = useRef(selectedResourceId);
+  resourcesRef.current          = resources;
+  activeCategoryRef.current     = activeCategory;
+  selectedResourceIdRef.current = selectedResourceId;
 
   // ── Init map ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -300,6 +321,9 @@ export function MapView({
       // Repopulate data after any style rebuild (initial load or theme switch)
       const source = map.current.getSource("resources") as mapboxgl.GeoJSONSource | undefined;
       source?.setData(buildResourceGeoJSON(resourcesRef.current, activeCategoryRef.current));
+      // Restore selected-pin filter
+      const sel = selectedResourceIdRef.current;
+      map.current.setFilter("selected-pin-ring", ["==", ["get", "primary_id"], sel ?? "__none__"]);
     });
 
     map.current.on("moveend", () => {
@@ -364,11 +388,34 @@ export function MapView({
         .setLngLat(coords)
         .setHTML(buildGroupPopupHTML(group))
         .addTo(m);
+
+      // Select the primary resource so the panel card highlights + scrolls
+      onSelectResource?.(ids[0]);
     };
 
     m.on("click", "resource-pins", handlePinClick);
     return () => { m.off("click", "resource-pins", handlePinClick); };
   }, [resources, mapLoaded]);
+
+  // ── Selected resource — update ring highlight + fly if off-screen ────────
+  useEffect(() => {
+    if (!mapLoaded || !map.current) return;
+    // Update the ring layer filter
+    map.current.setFilter(
+      "selected-pin-ring",
+      ["==", ["get", "primary_id"], selectedResourceId ?? "__none__"]
+    );
+    // Fly to the resource only when selected from the panel (i.e. not already visible)
+    if (!selectedResourceId) return;
+    const resource = resources.find(r => r.id === selectedResourceId);
+    if (!resource) return;
+    const coord = getSafeResourceCoord(resource);
+    if (!coord) return;
+    const zoom = map.current.getZoom();
+    if (zoom < 8 || !map.current.getBounds().contains(coord as mapboxgl.LngLatLike)) {
+      map.current.flyTo({ center: coord, zoom: Math.max(zoom, 10), duration: 800 });
+    }
+  }, [selectedResourceId, mapLoaded, resources]);
 
   // ── Theme switch — swap style; style.load handler above re-adds everything ─
   const themeRef = useRef(theme);

@@ -18,6 +18,7 @@ export default function MapPage() {
   const [aiSummary, setAiSummary] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(false);
   const [currentLang, setCurrentLang] = useState("EN");
+  const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
 
   // Mobile drawer state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -128,6 +129,8 @@ export default function MapPage() {
           activeCategory={activeCategory}
           onMobileSidebarToggle={() => setMobileSidebarOpen(true)}
           onMobilePanelToggle={() => setMobilePanelOpen(true)}
+          selectedResourceId={selectedResourceId}
+          onSelectResource={setSelectedResourceId}
         />
 
         {/* Resource panel — desktop: static, mobile: fixed right drawer */}
@@ -146,6 +149,8 @@ export default function MapPage() {
             searchQuery={searchQuery}
             onSearchChange={val => { setSearchQuery(val); if (!val) setAiSummary(undefined); }}
             onClose={() => setMobilePanelOpen(false)}
+            selectedResourceId={selectedResourceId}
+            onSelectResource={setSelectedResourceId}
           />
         </div>
       </div>

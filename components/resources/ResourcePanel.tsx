@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Resource } from "@/types";
 import { ResourceCard } from "@/components/ui/ResourceCard";
 import { SearchInput } from "@/components/ui/SearchInput";
@@ -22,6 +22,8 @@ interface ResourcePanelProps {
   searchQuery: string;
   onSearchChange: (val: string) => void;
   onClose?: () => void;
+  selectedResourceId?: string | null;
+  onSelectResource?: (id: string) => void;
 }
 
 export function ResourcePanel({
@@ -33,8 +35,18 @@ export function ResourcePanel({
   searchQuery,
   onSearchChange,
   onClose,
+  selectedResourceId,
+  onSelectResource,
 }: ResourcePanelProps) {
   const [docFilter, setDocFilter] = useState<DocFilter>("all");
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Scroll selected card into view when selection changes (e.g. from map click)
+  useEffect(() => {
+    if (!selectedResourceId) return;
+    const el = cardRefs.current.get(selectedResourceId);
+    el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [selectedResourceId]);
 
   const filteredResources = docFilter === "all"
     ? resources
@@ -134,8 +146,16 @@ export function ResourcePanel({
           </div>
         ) : filteredResources.length > 0 ? (
           filteredResources.map(r => (
-            <div key={r.id} role="listitem">
-              <ResourceCard resource={r} />
+            <div
+              key={r.id}
+              role="listitem"
+              ref={el => { if (el) cardRefs.current.set(r.id, el); else cardRefs.current.delete(r.id); }}
+            >
+              <ResourceCard
+                resource={r}
+                selected={selectedResourceId === r.id}
+                onClick={onSelectResource ? () => onSelectResource(r.id) : undefined}
+              />
             </div>
           ))
         ) : (

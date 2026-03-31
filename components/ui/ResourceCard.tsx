@@ -15,9 +15,11 @@ const DOC_BADGE: Record<DocumentationRequired, { label: string; className: strin
 interface ResourceCardProps {
   resource: Resource;
   compact?: boolean;
+  selected?: boolean;
+  onClick?: () => void;
 }
 
-export function ResourceCard({ resource: r, compact }: ResourceCardProps) {
+export function ResourceCard({ resource: r, compact, selected, onClick }: ResourceCardProps) {
   const cat = CATEGORY_CONFIG[r.category];
   const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(`${r.address} ${r.city} ${r.state}`)}`;
 
@@ -26,9 +28,14 @@ export function ResourceCard({ resource: r, compact }: ResourceCardProps) {
       className={cn(
         "border rounded-lg bg-surface-1 p-3.5 transition-all group",
         r.urgent ? "border-l-[3px] border-l-red-500 border-border" : "border-border",
-        "hover:border-border-active hover:bg-surface-2"
+        selected
+          ? "border-accent bg-surface-2 ring-1 ring-accent/30"
+          : "hover:border-border-active hover:bg-surface-2",
+        onClick && "cursor-pointer"
       )}
-      aria-label={`${r.name}${r.urgent ? " — urgent" : ""}`}
+      onClick={onClick}
+      aria-label={`${r.name}${r.urgent ? " — urgent" : ""}${selected ? " — selected" : ""}`}
+      aria-selected={selected}
     >
       {/* Top row */}
       <div className="flex items-start justify-between mb-2.5">
