@@ -44,31 +44,84 @@ interface ResourceRow {
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const STATES = ["NY", "CA", "TX", "IL", "FL", "WA", "AZ", "MN"] as const;
+const STATES = [
+  "AL","AK","AR","AZ","CA","CO","CT","DC","DE","FL","GA","HI","IA","ID","IL",
+  "IN","KS","KY","LA","MA","MD","ME","MI","MN","MO","MS","MT","NC","ND","NE",
+  "NH","NJ","NM","NV","NY","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT",
+  "VA","VT","WA","WI","WV","WY",
+] as const;
 type State = typeof STATES[number];
 
 // State full names for Overpass queries
 const STATE_NAMES: Record<State, string> = {
-  NY: "New York",
-  CA: "California",
-  TX: "Texas",
-  IL: "Illinois",
-  FL: "Florida",
-  WA: "Washington",
-  AZ: "Arizona",
-  MN: "Minnesota",
+  AL: "Alabama",      AK: "Alaska",        AR: "Arkansas",      AZ: "Arizona",
+  CA: "California",   CO: "Colorado",      CT: "Connecticut",   DC: "District of Columbia",
+  DE: "Delaware",     FL: "Florida",       GA: "Georgia",       HI: "Hawaii",
+  IA: "Iowa",         ID: "Idaho",         IL: "Illinois",      IN: "Indiana",
+  KS: "Kansas",       KY: "Kentucky",      LA: "Louisiana",     MA: "Massachusetts",
+  MD: "Maryland",     ME: "Maine",         MI: "Michigan",      MN: "Minnesota",
+  MO: "Missouri",     MS: "Mississippi",   MT: "Montana",       NC: "North Carolina",
+  ND: "North Dakota", NE: "Nebraska",      NH: "New Hampshire", NJ: "New Jersey",
+  NM: "New Mexico",   NV: "Nevada",        NY: "New York",      OH: "Ohio",
+  OK: "Oklahoma",     OR: "Oregon",        PA: "Pennsylvania",  RI: "Rhode Island",
+  SC: "South Carolina", SD: "South Dakota", TN: "Tennessee",   TX: "Texas",
+  UT: "Utah",         VA: "Virginia",      VT: "Vermont",       WA: "Washington",
+  WI: "Wisconsin",    WV: "West Virginia", WY: "Wyoming",
 };
 
 // Approximate bounding boxes [south, west, north, east] for Overpass
 const STATE_BBOX: Record<State, [number, number, number, number]> = {
-  NY: [40.4,  -79.8, 45.1, -71.8],
-  CA: [32.5, -124.5, 42.0, -114.1],
-  TX: [25.8, -106.7, 36.5,  -93.5],
-  IL: [36.9,  -91.5, 42.5,  -87.0],
-  FL: [24.4,  -87.6, 31.0,  -80.0],
-  WA: [45.5, -124.8, 49.0, -116.9],
+  AL: [30.2,  -88.5, 35.0,  -84.9],
+  AK: [51.2, -170.0, 71.5, -130.0],
+  AR: [33.0,  -94.6, 36.5,  -89.6],
   AZ: [31.3, -114.8, 37.0, -109.0],
+  CA: [32.5, -124.5, 42.0, -114.1],
+  CO: [37.0, -109.1, 41.0, -102.0],
+  CT: [40.9,  -73.7, 42.1,  -71.8],
+  DC: [38.8,  -77.1, 39.0,  -76.9],
+  DE: [38.4,  -75.8, 39.8,  -75.0],
+  FL: [24.4,  -87.6, 31.0,  -80.0],
+  GA: [30.4,  -85.6, 35.0,  -81.0],
+  HI: [18.9, -160.2, 22.2, -154.8],
+  IA: [40.4,  -96.6, 43.5,  -90.1],
+  ID: [42.0, -117.2, 49.0, -111.0],
+  IL: [36.9,  -91.5, 42.5,  -87.0],
+  IN: [37.8,  -88.1, 41.8,  -84.8],
+  KS: [37.0, -102.1, 40.0,  -94.6],
+  KY: [36.5,  -89.6, 39.1,  -82.0],
+  LA: [28.9,  -94.0, 33.0,  -89.0],
+  MA: [41.2,  -73.5, 42.9,  -69.9],
+  MD: [37.9,  -79.5, 39.7,  -75.0],
+  ME: [43.0,  -71.1, 47.5,  -66.9],
+  MI: [41.7,  -90.4, 48.3,  -82.4],
   MN: [43.5,  -97.2, 49.4,  -89.5],
+  MO: [36.0,  -95.8, 40.6,  -89.1],
+  MS: [30.0,  -91.7, 35.0,  -88.1],
+  MT: [44.4, -116.1, 49.0, -104.0],
+  NC: [33.8,  -84.3, 36.6,  -75.5],
+  ND: [45.9, -104.0, 49.0,  -96.6],
+  NE: [40.0, -104.1, 43.0,  -95.3],
+  NH: [42.7,  -72.6, 45.3,  -70.6],
+  NJ: [38.9,  -75.6, 41.4,  -73.9],
+  NM: [31.3, -109.1, 37.0, -103.0],
+  NV: [35.0, -120.0, 42.0, -114.0],
+  NY: [40.4,  -79.8, 45.1,  -71.8],
+  OH: [38.4,  -84.8, 42.0,  -80.5],
+  OK: [33.6, -103.0, 37.0,  -94.4],
+  OR: [42.0, -124.6, 46.2, -116.5],
+  PA: [39.7,  -80.5, 42.3,  -74.7],
+  RI: [41.1,  -71.9, 42.0,  -71.1],
+  SC: [32.0,  -83.4, 35.2,  -78.5],
+  SD: [42.5, -104.1, 45.9,  -96.4],
+  TN: [34.9,  -90.3, 36.7,  -81.6],
+  TX: [25.8, -106.7, 36.5,  -93.5],
+  UT: [37.0, -114.1, 42.0, -109.0],
+  VA: [36.5,  -83.7, 39.5,  -75.2],
+  VT: [42.7,  -73.4, 45.0,  -71.5],
+  WA: [45.5, -124.8, 49.0, -116.9],
+  WI: [42.5,  -92.9, 47.3,  -86.8],
+  WV: [37.2,  -82.6, 40.6,  -77.7],
+  WY: [41.0, -111.1, 45.0, -104.0],
 };
 
 const supabase = createClient(
@@ -497,7 +550,155 @@ const LSC_ORGS: LSCOrg[] = [
   { name: "Mid-Minnesota Legal Aid",              state: "MN", city: "Minneapolis",   address: "111 N 5th St",         zip: "55403", phone: "(612) 332-1441", website: "https://www.mylegalaid.org" },
   { name: "Volunteer Lawyers Network",            state: "MN", city: "Minneapolis",   address: "600 Nicollet Mall",    zip: "55402", phone: "(612) 752-6677", website: "https://www.vlnmn.org" },
   { name: "Legal Aid Service of Northeastern MN", state: "MN", city: "Duluth",        address: "302 W Superior St",    zip: "55802", phone: "(218) 726-4800", website: "https://lasnem.org" },
-  { name: "Southern Minnesota Regional Legal Svcs", state: "MN", city: "Saint Paul",  address: "700 Minnesota Building, 46 E 4th St", zip: "55101", phone: "(651) 222-7925", website: "https://www.smrls.org" },
+  { name: "Southern Minnesota Regional Legal Svcs", state: "MN", city: "Saint Paul",  address: "46 E 4th St",          zip: "55101", phone: "(651) 222-7925", website: "https://www.smrls.org" },
+
+  // ── Alabama ───────────────────────────────────────────────────────────────
+  { name: "Legal Services Alabama",               state: "AL", city: "Montgomery",    address: "301 Washington Ave",   zip: "36104", phone: "(334) 832-4570", website: "https://legalservicesalabama.org" },
+  { name: "Birmingham Volunteer Lawyers Program", state: "AL", city: "Birmingham",    address: "2021 2nd Ave N",       zip: "35203", phone: "(205) 250-5200", website: "https://www.alabar.org" },
+
+  // ── Alaska ────────────────────────────────────────────────────────────────
+  { name: "Alaska Legal Services Corporation",    state: "AK", city: "Anchorage",     address: "1016 W 6th Ave",       zip: "99501", phone: "(907) 272-9431", website: "https://alsc-law.org" },
+
+  // ── Arkansas ──────────────────────────────────────────────────────────────
+  { name: "Legal Aid of Arkansas",                state: "AR", city: "Jonesboro",     address: "714 S Main St",        zip: "72401", phone: "(870) 972-9224", website: "https://arlegalaid.org" },
+  { name: "Center for Arkansas Legal Services",   state: "AR", city: "Little Rock",   address: "303 W Capitol Ave",    zip: "72201", phone: "(501) 376-3423", website: "https://arlegalservices.org" },
+
+  // ── Colorado ──────────────────────────────────────────────────────────────
+  { name: "Colorado Legal Services",              state: "CO", city: "Denver",         address: "1905 Sherman St",      zip: "80203", phone: "(303) 837-1313", website: "https://coloradolegalservices.org" },
+
+  // ── Connecticut ───────────────────────────────────────────────────────────
+  { name: "Connecticut Legal Services",           state: "CT", city: "Waterbury",      address: "211 State St",         zip: "06702", phone: "(203) 756-9053", website: "https://ctlegal.org" },
+  { name: "Greater Hartford Legal Aid",           state: "CT", city: "Hartford",       address: "999 Asylum Ave",       zip: "06105", phone: "(860) 541-5000", website: "https://ghla.org" },
+
+  // ── DC ────────────────────────────────────────────────────────────────────
+  { name: "Legal Aid Society of D.C.",            state: "DC", city: "Washington",     address: "1331 H St NW",         zip: "20005", phone: "(202) 628-1161", website: "https://legalaiddc.org" },
+  { name: "Bread for the City Legal Clinic",      state: "DC", city: "Washington",     address: "1525 7th St NW",       zip: "20001", phone: "(202) 265-2400", website: "https://breadforthecity.org" },
+
+  // ── Delaware ──────────────────────────────────────────────────────────────
+  { name: "Community Legal Aid Society",          state: "DE", city: "Wilmington",     address: "100 W 10th St",        zip: "19801", phone: "(302) 575-0660", website: "https://declasi.org" },
+
+  // ── Georgia ───────────────────────────────────────────────────────────────
+  { name: "Georgia Legal Services Program",       state: "GA", city: "Atlanta",        address: "104 Marietta St NW",   zip: "30303", phone: "(404) 206-5175", website: "https://glsp.org" },
+  { name: "Atlanta Legal Aid Society",            state: "GA", city: "Atlanta",        address: "54 Ellis St NE",       zip: "30303", phone: "(404) 524-5811", website: "https://atlantalegalaid.org" },
+
+  // ── Hawaii ────────────────────────────────────────────────────────────────
+  { name: "Legal Aid Society of Hawaii",          state: "HI", city: "Honolulu",       address: "924 Bethel St",        zip: "96813", phone: "(808) 536-4302", website: "https://legalaidhawaii.org" },
+
+  // ── Idaho ─────────────────────────────────────────────────────────────────
+  { name: "Idaho Legal Aid Services",             state: "ID", city: "Boise",          address: "310 N 5th St",         zip: "83702", phone: "(208) 336-8980", website: "https://idaholegalaid.org" },
+
+  // ── Indiana ───────────────────────────────────────────────────────────────
+  { name: "Indiana Legal Services",               state: "IN", city: "Indianapolis",   address: "151 N Delaware St",    zip: "46204", phone: "(317) 631-9410", website: "https://indianalegalservices.org" },
+
+  // ── Iowa ──────────────────────────────────────────────────────────────────
+  { name: "Iowa Legal Aid",                       state: "IA", city: "Des Moines",     address: "1111 9th St",          zip: "50314", phone: "(515) 243-2151", website: "https://iowalegalaid.org" },
+
+  // ── Kansas ────────────────────────────────────────────────────────────────
+  { name: "Kansas Legal Services",                state: "KS", city: "Topeka",         address: "712 S Kansas Ave",     zip: "66603", phone: "(785) 233-2068", website: "https://kansaslegalservices.org" },
+
+  // ── Kentucky ──────────────────────────────────────────────────────────────
+  { name: "Legal Aid of the Bluegrass",           state: "KY", city: "Covington",      address: "302 W Pike St",        zip: "41011", phone: "(859) 431-8200", website: "https://lablaw.org" },
+  { name: "Appalachian Research & Defense Fund",  state: "KY", city: "Prestonsburg",   address: "120 N Front Ave",      zip: "41653", phone: "(606) 886-8688", website: "https://ardfky.org" },
+
+  // ── Louisiana ─────────────────────────────────────────────────────────────
+  { name: "Southeast Louisiana Legal Services",   state: "LA", city: "New Orleans",    address: "1010 Common St",       zip: "70112", phone: "(504) 529-1000", website: "https://slls.org" },
+  { name: "Acadiana Legal Service Corporation",   state: "LA", city: "Lafayette",      address: "1020 Surrey St",       zip: "70501", phone: "(337) 237-4320", website: "https://acadianalegal.org" },
+
+  // ── Maine ─────────────────────────────────────────────────────────────────
+  { name: "Pine Tree Legal Assistance",           state: "ME", city: "Portland",       address: "88 Federal St",        zip: "04101", phone: "(207) 774-8211", website: "https://ptla.org" },
+
+  // ── Maryland ──────────────────────────────────────────────────────────────
+  { name: "Maryland Legal Aid Bureau",            state: "MD", city: "Baltimore",      address: "500 E Lexington St",   zip: "21202", phone: "(410) 539-5340", website: "https://mdlab.org" },
+
+  // ── Massachusetts ─────────────────────────────────────────────────────────
+  { name: "Greater Boston Legal Services",        state: "MA", city: "Boston",         address: "197 Friend St",        zip: "02114", phone: "(617) 603-1700", website: "https://gbls.org" },
+  { name: "South Coastal Counties Legal Services", state: "MA", city: "Brockton",      address: "231 Main St",          zip: "02301", phone: "(508) 586-2110", website: "https://sccls.org" },
+
+  // ── Michigan ──────────────────────────────────────────────────────────────
+  { name: "Legal Services of South Central Michigan", state: "MI", city: "Ann Arbor",  address: "2990 E Michigan Ave",  zip: "48108", phone: "(734) 665-6181", website: "https://lsscm.org" },
+  { name: "Michigan Advocacy Program",            state: "MI", city: "Lansing",        address: "420 S Michigan Ave",   zip: "48933", phone: "(517) 372-0622", website: "https://miadvocacy.org" },
+
+  // ── Mississippi ───────────────────────────────────────────────────────────
+  { name: "Mississippi Center for Legal Services", state: "MS", city: "Jackson",       address: "120 N Congress St",    zip: "39201", phone: "(601) 948-6752", website: "https://mscenterforlegalservices.org" },
+  { name: "North MS Rural Legal Services",        state: "MS", city: "Oxford",         address: "220 S Lamar Blvd",     zip: "38655", phone: "(662) 234-8731", website: "https://nmrls.com" },
+
+  // ── Missouri ──────────────────────────────────────────────────────────────
+  { name: "Legal Services of Eastern Missouri",   state: "MO", city: "Saint Louis",    address: "4232 Forest Park Ave", zip: "63108", phone: "(314) 534-4200", website: "https://lsem.org" },
+  { name: "Legal Aid of Western Missouri",        state: "MO", city: "Kansas City",    address: "1125 Grand Blvd",      zip: "64106", phone: "(816) 474-6750", website: "https://lawmo.org" },
+
+  // ── Montana ───────────────────────────────────────────────────────────────
+  { name: "Montana Legal Services Association",   state: "MT", city: "Helena",         address: "616 Helena Ave",       zip: "59601", phone: "(406) 442-9830", website: "https://montanalegalservices.org" },
+
+  // ── Nebraska ──────────────────────────────────────────────────────────────
+  { name: "Nebraska Legal Aid",                   state: "NE", city: "Omaha",          address: "134 S 13th St",        zip: "68508", phone: "(402) 348-1069", website: "https://nebraskalegalaid.org" },
+
+  // ── Nevada ────────────────────────────────────────────────────────────────
+  { name: "Nevada Legal Aid",                     state: "NV", city: "Las Vegas",      address: "530 S 6th St",         zip: "89101", phone: "(702) 386-1070", website: "https://nlvlaw.org" },
+  { name: "Washoe Legal Services",                state: "NV", city: "Reno",           address: "299 Bledsoe Ln",       zip: "89502", phone: "(775) 329-2727", website: "https://washoelegalservices.org" },
+
+  // ── New Hampshire ─────────────────────────────────────────────────────────
+  { name: "New Hampshire Legal Assistance",       state: "NH", city: "Manchester",     address: "1750 Elm St",          zip: "03104", phone: "(603) 625-6560", website: "https://nhla.org" },
+
+  // ── New Jersey ────────────────────────────────────────────────────────────
+  { name: "Legal Services of New Jersey",         state: "NJ", city: "Edison",         address: "100 Metroplex Dr",     zip: "08817", phone: "(888) 576-5529", website: "https://lsnj.org" },
+  { name: "South Jersey Legal Services",          state: "NJ", city: "Camden",         address: "745 Market St",        zip: "08102", phone: "(856) 964-2010", website: "https://southjerseylegalservices.org" },
+
+  // ── New Mexico ────────────────────────────────────────────────────────────
+  { name: "New Mexico Legal Aid",                 state: "NM", city: "Albuquerque",    address: "301 Gold Ave SW",      zip: "87102", phone: "(505) 243-7871", website: "https://nmlegalaid.org" },
+
+  // ── North Carolina ────────────────────────────────────────────────────────
+  { name: "Legal Aid of North Carolina",          state: "NC", city: "Raleigh",        address: "224 S Dawson St",      zip: "27601", phone: "(919) 856-2564", website: "https://legalaidnc.org" },
+
+  // ── North Dakota ──────────────────────────────────────────────────────────
+  { name: "Legal Services of North Dakota",       state: "ND", city: "Bismarck",       address: "418 E Broadway",       zip: "58501", phone: "(701) 222-2110", website: "https://lsnd.org" },
+
+  // ── Ohio ──────────────────────────────────────────────────────────────────
+  { name: "Legal Aid Society of Columbus",        state: "OH", city: "Columbus",       address: "1108 City Park Ave",   zip: "43206", phone: "(614) 224-8374", website: "https://columbuslegalaid.org" },
+  { name: "Legal Aid Society of Cleveland",       state: "OH", city: "Cleveland",      address: "1223 W 6th St",        zip: "44113", phone: "(216) 687-1900", website: "https://lasclev.org" },
+
+  // ── Oklahoma ──────────────────────────────────────────────────────────────
+  { name: "Legal Aid Services of Oklahoma",       state: "OK", city: "Oklahoma City",  address: "2915 Classen Blvd",    zip: "73106", phone: "(405) 521-1302", website: "https://legalaidok.org" },
+
+  // ── Oregon ────────────────────────────────────────────────────────────────
+  { name: "Legal Aid Services of Oregon",         state: "OR", city: "Portland",       address: "520 SW 6th Ave",       zip: "97204", phone: "(503) 224-4086", website: "https://lasoregon.org" },
+  { name: "Oregon Law Center",                    state: "OR", city: "Salem",          address: "230 Church St NE",     zip: "97301", phone: "(503) 485-4152", website: "https://oregonlawcenter.org" },
+
+  // ── Pennsylvania ──────────────────────────────────────────────────────────
+  { name: "Community Legal Services",             state: "PA", city: "Philadelphia",   address: "1424 Chestnut St",     zip: "19102", phone: "(215) 981-3700", website: "https://clsphila.org" },
+  { name: "MidPenn Legal Services",               state: "PA", city: "Harrisburg",     address: "213 N Front St",       zip: "17101", phone: "(717) 234-4121", website: "https://midpenn.org" },
+
+  // ── Rhode Island ──────────────────────────────────────────────────────────
+  { name: "Rhode Island Legal Services",          state: "RI", city: "Providence",     address: "56 Pine St",           zip: "02903", phone: "(401) 274-2652", website: "https://rils.org" },
+
+  // ── South Carolina ────────────────────────────────────────────────────────
+  { name: "South Carolina Legal Services",        state: "SC", city: "Columbia",       address: "2109 Bull St",         zip: "29201", phone: "(803) 799-9668", website: "https://sclegal.org" },
+
+  // ── South Dakota ──────────────────────────────────────────────────────────
+  { name: "East River Legal Services",            state: "SD", city: "Sioux Falls",    address: "335 N Main Ave",       zip: "57104", phone: "(605) 336-9230", website: "https://eastriverlegalservices.org" },
+  { name: "Dakota Plains Legal Services",         state: "SD", city: "Mission",        address: "101 Main St",          zip: "57555", phone: "(605) 856-4444", website: "https://dpls.org" },
+
+  // ── Tennessee ─────────────────────────────────────────────────────────────
+  { name: "Legal Aid Society of Middle Tennessee", state: "TN", city: "Nashville",     address: "300 Deaderick St",     zip: "37201", phone: "(615) 244-6610", website: "https://las.org" },
+  { name: "Memphis Area Legal Services",          state: "TN", city: "Memphis",        address: "200 Jefferson Ave",    zip: "38103", phone: "(901) 523-8822", website: "https://malsi.org" },
+
+  // ── Utah ──────────────────────────────────────────────────────────────────
+  { name: "Utah Legal Services",                  state: "UT", city: "Salt Lake City", address: "186 N 400 W",          zip: "84103", phone: "(801) 328-8891", website: "https://utahlegalservices.org" },
+
+  // ── Vermont ───────────────────────────────────────────────────────────────
+  { name: "Vermont Legal Aid",                    state: "VT", city: "Burlington",     address: "264 N Winooski Ave",   zip: "05401", phone: "(802) 863-5620", website: "https://vtlegalaid.org" },
+
+  // ── Virginia ──────────────────────────────────────────────────────────────
+  { name: "Legal Aid Justice Center",             state: "VA", city: "Charlottesville", address: "1000 Preston Ave",    zip: "22903", phone: "(434) 977-0553", website: "https://justice4all.org" },
+  { name: "Central Virginia Legal Aid Society",   state: "VA", city: "Richmond",       address: "101 W Broad St",       zip: "23220", phone: "(804) 648-1012", website: "https://cvlas.org" },
+
+  // ── West Virginia ─────────────────────────────────────────────────────────
+  { name: "Legal Aid of West Virginia",           state: "WV", city: "Charleston",     address: "922 Quarrier St",      zip: "25301", phone: "(304) 342-6814", website: "https://lawv.net" },
+
+  // ── Wisconsin ─────────────────────────────────────────────────────────────
+  { name: "Legal Action of Wisconsin",            state: "WI", city: "Milwaukee",      address: "230 W Wells St",       zip: "53203", phone: "(414) 278-7722", website: "https://legalaction.org" },
+
+  // ── Wyoming ───────────────────────────────────────────────────────────────
+  { name: "Wyoming Center for Equality",          state: "WY", city: "Cheyenne",       address: "1622 Carey Ave",       zip: "82001", phone: "(307) 634-9261", website: "https://wycenter.org" },
 ];
 
 async function seedLSC(existing: Set<string>) {
