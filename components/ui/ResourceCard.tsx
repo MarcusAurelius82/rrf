@@ -60,7 +60,7 @@ export function ResourceCard({ resource: r, compact }: ResourceCardProps) {
             URGENT
           </span>
         )}
-        {r.documentation_required && (
+        {r.documentation_required && DOC_BADGE[r.documentation_required] && (
           <span className={cn(
             "inline-block font-mono text-[8px] font-bold tracking-[0.1em] px-2 py-0.5 rounded border",
             DOC_BADGE[r.documentation_required].className
