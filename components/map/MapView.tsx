@@ -319,15 +319,23 @@ export function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Update GeoJSON data when resources / category change ─────────────────
+  // ── Update grid heatmap when density changes ──────────────────────────────
+  useEffect(() => {
+    if (!mapLoaded || !map.current) return;
+    const src = map.current.getSource("grid-heatmap") as mapboxgl.GeoJSONSource | undefined;
+    if (!src) return;
+    src.setData(gridGeoJSON);
+  }, [gridGeoJSON, mapLoaded]);
+
+  // ── Update resource GeoJSON when resources / category / theme change ────────
   useEffect(() => {
     if (!mapLoaded || !map.current) return;
     const source = map.current.getSource("resources") as mapboxgl.GeoJSONSource | undefined;
-    if (!source) { console.warn("[MapView] source 'resources' not found"); return; }
+    if (!source) return; // style is mid-reload; theme-switch handler will repopulate
     const geojson = buildResourceGeoJSON(resources, activeCategory);
     console.log(`[MapView] setData: ${resources.length} resources → ${geojson.features.length} features`);
     source.setData(geojson);
-  }, [resources, activeCategory, mapLoaded]);
+  }, [resources, activeCategory, mapLoaded, theme]);
 
   // ── Pin click handler — needs fresh `resources` for popup content ─────────
   useEffect(() => {
