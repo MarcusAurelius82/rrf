@@ -266,6 +266,12 @@ export function MapView({
   const [clicking, setClicking]   = useState(false);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 37.09, lng: -95.71 });
 
+  // Refs so async callbacks (style.load, idle) always see the latest props
+  const resourcesRef      = useRef(resources);
+  const activeCategoryRef = useRef(activeCategory);
+  resourcesRef.current      = resources;
+  activeCategoryRef.current = activeCategory;
+
   // ── Init map ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
@@ -281,13 +287,19 @@ export function MapView({
 
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
 
-    map.current.on("load", () => {
-      console.log("[MapView] map loaded, setting up layers");
-      setupMapLayers(map.current!);
-      // Ensure canvas matches container dimensions (flex layout may not be settled yet)
-      map.current!.resize();
+    // Persistent handler — fires on initial load AND after every setStyle() rebuild.
+    // This ensures sources/layers are always present regardless of SSR→hydration
+    // theme switches that trigger a full style rebuild.
+    map.current.on("style.load", () => {
+      if (!map.current) return;
+      console.log("[MapView] style loaded, setting up layers");
+      setupMapLayers(map.current);
+      map.current.resize();
       setMapLoaded(true);
-      map.current!.getCanvas().style.cursor = "pointer";
+      map.current.getCanvas().style.cursor = "pointer";
+      // Repopulate data after any style rebuild (initial load or theme switch)
+      const source = map.current.getSource("resources") as mapboxgl.GeoJSONSource | undefined;
+      source?.setData(buildResourceGeoJSON(resourcesRef.current, activeCategoryRef.current));
     });
 
     map.current.on("moveend", () => {
@@ -358,21 +370,15 @@ export function MapView({
     return () => { m.off("click", "resource-pins", handlePinClick); };
   }, [resources, mapLoaded]);
 
-  // ── Theme switch — re-add layers after new style loads ───────────────────
+  // ── Theme switch — swap style; style.load handler above re-adds everything ─
   const themeRef = useRef(theme);
   useEffect(() => {
-    if (!map.current || !mapLoaded) return;
+    if (!map.current) return;
     if (themeRef.current === theme) return;
     themeRef.current = theme;
-    map.current.once("idle", () => {
-      if (!map.current) return;
-      setupMapLayers(map.current);
-      const source = map.current.getSource("resources") as mapboxgl.GeoJSONSource | undefined;
-      source?.setData(buildResourceGeoJSON(resources, activeCategory));
-    });
     map.current.setStyle(MAP_STYLES[theme]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [theme, mapLoaded]);
+  }, [theme]);
 
   // ── Fly to selected state ─────────────────────────────────────────────────
   useEffect(() => {
