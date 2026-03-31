@@ -127,7 +127,7 @@ function buildResourceGeoJSON(resources: Resource[], activeCategory: ResourceCat
   const features: Array<{
     type: "Feature";
     geometry: { type: "Point"; coordinates: [number, number] };
-    properties: { ids: string; category: string; urgent: boolean };
+    properties: { ids: string; primary_id: string; category: string; urgent: boolean };
   }> = [];
 
   for (const group of groups.values()) {
