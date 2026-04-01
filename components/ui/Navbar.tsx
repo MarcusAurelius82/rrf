@@ -93,14 +93,14 @@ export function Navbar({ onLanguageChange, currentLang = "EN" }: NavbarProps) {
               <ul
                 role="listbox"
                 aria-label="Select language"
-                className="absolute right-0 top-full mt-1 w-44 bg-surface-2 border border-border-active rounded-lg overflow-hidden shadow-xl z-50"
+                className="absolute right-0 top-full mt-1 w-44 max-w-[calc(100vw-1rem)] bg-surface-2 border border-border-active rounded-lg overflow-hidden shadow-xl z-50"
               >
                 {[{ code: "EN", label: "English", flag: "🇺🇸" }, ...SUPPORTED_LANGUAGES].map(lang => (
                   <li key={lang.code} role="option" aria-selected={currentLang === lang.code}>
                     <button
                       onClick={() => { onLanguageChange?.(lang.code); setLangOpen(false); }}
                       className={cn(
-                        "w-full flex items-center gap-2.5 px-3 py-2 font-mono text-[11px] text-content-secondary hover:bg-surface-3 hover:text-content-primary transition-all text-left",
+                        "w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 font-mono text-[11px] text-content-secondary hover:bg-surface-3 hover:text-content-primary transition-all text-left",
                         currentLang === lang.code && "text-content-primary bg-surface-3"
                       )}
                     >

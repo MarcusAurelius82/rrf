@@ -141,3 +141,8 @@ body.drawer-open { overflow: hidden; }
 html[data-theme="light"] .mapboxgl-ctrl-attrib-inner a {
   color: #555 !important;
 }
+
+/* Hide status bar on landscape phones where vertical space is critical */
+@media (max-height: 480px) {
+  [data-status-bar] { display: none !important; }
+}

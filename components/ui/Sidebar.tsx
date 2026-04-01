@@ -1,4 +1,5 @@
 "use client";
+import { useRef } from "react";
 import { cn } from "@/lib/utils";
 import { CATEGORY_CONFIG } from "@/lib/utils";
 import { ResourceCategory } from "@/types";
@@ -18,10 +19,19 @@ export function Sidebar({
   onReportMissing,
   onClose,
 }: SidebarProps) {
+  const touchStartX = useRef<number | null>(null);
+
   return (
     <aside
-      className="w-[220px] flex-shrink-0 border-r border-border bg-surface-0 flex flex-col py-4 overflow-y-auto h-full"
+      className="w-full md:w-[220px] flex-shrink-0 border-r border-border bg-surface-0 flex flex-col py-4 overflow-y-auto h-full"
       aria-label="Resource category filters"
+      onTouchStart={e => { touchStartX.current = e.touches[0].clientX; }}
+      onTouchEnd={e => {
+        if (touchStartX.current === null) return;
+        const delta = e.changedTouches[0].clientX - touchStartX.current;
+        touchStartX.current = null;
+        if (delta < -50) onClose?.();
+      }}
     >
       {/* Mobile header */}
       {onClose && (
@@ -30,7 +40,7 @@ export function Sidebar({
           <button
             onClick={onClose}
             aria-label="Close filters"
-            className="w-7 h-7 flex items-center justify-center rounded-md text-content-tertiary hover:text-content-primary hover:bg-border transition-all text-[12px]"
+            className="w-11 h-11 md:w-7 md:h-7 flex items-center justify-center rounded-md text-content-tertiary hover:text-content-primary hover:bg-border transition-all text-[12px]"
           >
             ✕
           </button>
@@ -38,10 +48,10 @@ export function Sidebar({
       )}
 
       <div className="px-3.5 pb-4">
-        <div className="font-mono text-[9px] font-semibold text-content-muted tracking-[0.12em] mb-1" aria-hidden="true">
+        <div className="font-mono text-[11px] md:text-[9px] font-semibold text-content-muted tracking-[0.12em] mb-1" aria-hidden="true">
           RESOURCES
         </div>
-        <div className="font-mono text-[11px] font-semibold text-content-tertiary tracking-[0.06em] mb-3" aria-hidden="true">
+        <div className="font-mono text-[12px] md:text-[11px] font-semibold text-content-tertiary tracking-[0.06em] mb-3" aria-hidden="true">
           FILTER_BY_TYPE
         </div>
 
@@ -57,7 +67,7 @@ export function Sidebar({
                 aria-pressed={isActive}
                 aria-label={`${label} — ${count} resource${count !== 1 ? "s" : ""}${isActive ? " (active)" : ""}`}
                 className={cn(
-                  "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md mb-0.5 border transition-all",
+                  "w-full flex items-center gap-2.5 px-2.5 py-3 md:py-2 rounded-md mb-0.5 border transition-all",
                   isActive
                     ? "bg-surface-2 border-border"
                     : "bg-transparent border-transparent hover:bg-surface-1"
@@ -71,7 +81,7 @@ export function Sidebar({
                   {icon}
                 </div>
                 <span
-                  className="font-mono text-[10px] font-semibold tracking-[0.08em] flex-1 text-left"
+                  className="font-mono text-[11px] md:text-[10px] font-semibold tracking-[0.08em] flex-1 text-left"
                   style={{ color: isActive ? color : "var(--text-secondary)" }}
                 >
                   {label}
