@@ -3,7 +3,7 @@ import { useRef, useEffect, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { Resource, ResourceCategory } from "@/types";
-import { CATEGORY_CONFIG } from "@/lib/utils";
+import { CATEGORY_CONFIG, cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
