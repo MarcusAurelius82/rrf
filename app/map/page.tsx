@@ -34,11 +34,10 @@ export default function MapPage() {
     return () => document.body.classList.remove("drawer-open");
   }, [mobileSidebarOpen, reportModalOpen]);
 
-  // Fetch resources on mount and when state/category changes
+  // Fetch resources nationwide — state selection only flies the map, never filters the data
   useEffect(() => {
     setIsLoading(true);
     const params = new URLSearchParams();
-    if (selectedState) params.set("state", selectedState);
     if (activeCategory) params.set("category", activeCategory);
 
     fetch(`/api/resources?${params}`)
@@ -46,7 +45,7 @@ export default function MapPage() {
       .then(({ data }) => { setResources(data || []); setFilteredResources(data || []); })
       .catch(console.error)
       .finally(() => setIsLoading(false));
-  }, [selectedState, activeCategory]);
+  }, [activeCategory]);
 
   // Client-side filter
   useEffect(() => {
