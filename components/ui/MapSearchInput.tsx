@@ -8,6 +8,7 @@ interface Suggestion {
   sub?: string;
   value: string;
   icon?: string;
+  type: "zip" | "city" | "category" | "resource";
 }
 
 function getSuggestions(query: string, resources: Resource[]): Suggestion[] {
@@ -24,7 +25,7 @@ function getSuggestions(query: string, resources: Resource[]): Suggestion[] {
       if (!zipMatches.has(r.zip)) zipMatches.set(r.zip, r);
     });
     zipMatches.forEach((r, zip) => {
-      suggestions.push({ label: zip, sub: `${r.city}, ${r.state}`, value: zip, icon: "⊙" });
+      suggestions.push({ label: zip, sub: `${r.city}, ${r.state}`, value: zip, icon: "⊙", type: "zip" });
     });
     return suggestions.slice(0, 5);
   }
@@ -34,7 +35,7 @@ function getSuggestions(query: string, resources: Resource[]): Suggestion[] {
     .forEach(([, cat]) => {
       if (cat.label.toLowerCase().includes(q) && !seen.has(cat.label)) {
         seen.add(cat.label);
-        suggestions.push({ label: cat.label, sub: "category", value: cat.label, icon: cat.icon });
+        suggestions.push({ label: cat.label, sub: "category", value: cat.label, icon: cat.icon, type: "category" });
       }
     });
 
@@ -47,7 +48,7 @@ function getSuggestions(query: string, resources: Resource[]): Suggestion[] {
   cityMap.forEach((_, cityState) => {
     if (!seen.has(cityState)) {
       seen.add(cityState);
-      suggestions.push({ label: cityState, sub: "city", value: cityState, icon: "⊙" });
+      suggestions.push({ label: cityState, sub: "city", value: cityState, icon: "⊙", type: "city" });
     }
   });
 
@@ -63,6 +64,7 @@ function getSuggestions(query: string, resources: Resource[]): Suggestion[] {
           sub: `${r.city}, ${r.state}`,
           value: r.name,
           icon: CATEGORY_CONFIG[r.category]?.icon,
+          type: "resource",
         });
       }
     });
@@ -70,10 +72,25 @@ function getSuggestions(query: string, resources: Resource[]): Suggestion[] {
   return suggestions.slice(0, 6);
 }
 
+async function geocodeLocation(query: string): Promise<[number, number] | null> {
+  try {
+    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+    const url =
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json` +
+      `?country=US&access_token=${token}`;
+    const res = await fetch(url);
+    const json = await res.json() as { features?: Array<{ center?: [number, number] }> };
+    const center = json.features?.[0]?.center;
+    if (center && center.length === 2) return center;
+  } catch { /* ignore */ }
+  return null;
+}
+
 interface MapSearchInputProps {
   resources: Resource[];
   value: string;
   onSearch: (query: string) => void;
+  onLocationSearch?: (coords: [number, number], label: string) => void;
   placeholder?: string;
   className?: string;
 }
@@ -82,6 +99,7 @@ export function MapSearchInput({
   resources,
   value,
   onSearch,
+  onLocationSearch,
   placeholder,
   className,
 }: MapSearchInputProps) {
@@ -107,7 +125,7 @@ export function MapSearchInput({
     }, 180);
   }
 
-  function commit(val: string) {
+  function commitText(val: string) {
     setLocalValue(val);
     setSuggestions([]);
     setOpen(false);
@@ -115,13 +133,35 @@ export function MapSearchInput({
     inputRef.current?.blur();
   }
 
+  async function commitSuggestion(s: Suggestion) {
+    setLocalValue(s.label);
+    setSuggestions([]);
+    setOpen(false);
+    inputRef.current?.blur();
+
+    // City or zip → geocode and show nearest resources
+    if ((s.type === "city" || s.type === "zip") && onLocationSearch) {
+      const coords = await geocodeLocation(s.value);
+      if (coords) {
+        onLocationSearch(coords, s.label);
+        return;
+      }
+    }
+    // Category or resource name → full-text search
+    onSearch(s.value);
+  }
+
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter") {
       e.preventDefault();
-      commit(activeIdx >= 0 ? (suggestions[activeIdx]?.value ?? localValue) : localValue);
+      if (activeIdx >= 0 && suggestions[activeIdx]) {
+        commitSuggestion(suggestions[activeIdx]);
+      } else {
+        commitText(localValue);
+      }
     } else if (e.key === "Escape") {
       setOpen(false);
-      commit("");
+      commitText("");
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
       setActiveIdx(i => Math.min(i + 1, suggestions.length - 1));
@@ -156,11 +196,11 @@ export function MapSearchInput({
           aria-expanded={open && suggestions.length > 0}
           // font-size ≥ 16px prevents iOS/Android from zooming on focus
           style={{ fontSize: 16 }}
-          className="w-full bg-surface-0/95 backdrop-blur-sm border border-border rounded-lg pl-8 pr-8 py-2.5 font-mono text-content-primary placeholder-content-muted outline-none focus:border-accent transition-all"
+          className="w-full bg-surface-0 border border-border rounded-lg pl-8 pr-8 py-2.5 font-mono text-content-primary placeholder-content-muted outline-none focus:border-accent transition-all shadow-md"
         />
         {localValue && (
           <button
-            onMouseDown={e => { e.preventDefault(); commit(""); setLocalValue(""); }}
+            onMouseDown={e => { e.preventDefault(); commitText(""); setLocalValue(""); }}
             tabIndex={-1}
             className="absolute right-2.5 text-content-muted hover:text-content-primary text-[12px] w-5 h-5 flex items-center justify-center"
             aria-label="Clear search"
@@ -174,12 +214,12 @@ export function MapSearchInput({
       {open && suggestions.length > 0 && (
         <ul
           role="listbox"
-          className="absolute top-full left-0 right-0 mt-1 bg-surface-0 border border-border rounded-lg overflow-hidden z-50 shadow-xl"
+          className="absolute top-full left-0 right-0 mt-1 bg-surface-0 border border-border rounded-lg overflow-hidden z-50 shadow-2xl"
         >
           {suggestions.map((s, i) => (
             <li key={i} role="option" aria-selected={i === activeIdx}>
               <button
-                onMouseDown={e => { e.preventDefault(); commit(s.value); }}
+                onMouseDown={e => { e.preventDefault(); commitSuggestion(s); }}
                 className={cn(
                   "w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors",
                   i === activeIdx ? "bg-surface-2" : "hover:bg-surface-1",
@@ -197,6 +237,11 @@ export function MapSearchInput({
                     </span>
                   )}
                 </span>
+                {(s.type === "city" || s.type === "zip") && (
+                  <span className="font-mono text-[8px] text-accent tracking-[0.08em] flex-shrink-0">
+                    NEARBY
+                  </span>
+                )}
               </button>
             </li>
           ))}

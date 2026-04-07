@@ -4,6 +4,31 @@ import { CATEGORY_CONFIG } from "@/lib/utils";
 import { StatusBadge } from "./StatusBadge";
 import { cn } from "@/lib/utils";
 
+function formatHours(hours: Record<string, string>): string {
+  const entries = Object.entries(hours).filter(([, h]) => h && h.trim());
+  if (!entries.length) return "";
+  const uniqueTimes = [...new Set(entries.map(([, h]) => h))];
+  const dayKeys = entries.map(([d]) => d.toLowerCase().slice(0, 3));
+
+  if (uniqueTimes.length === 1) {
+    const weekdays = new Set(["mon", "tue", "wed", "thu", "fri"]);
+    const allWeekdays =
+      entries.length === 5 &&
+      dayKeys.every(d => weekdays.has(d)) &&
+      dayKeys.every(d => d !== "sat" && d !== "sun");
+    if (allWeekdays) return `MON–FRI  ${uniqueTimes[0]}`;
+    if (entries.length <= 3)
+      return `${dayKeys.map(d => d.toUpperCase()).join(", ")}  ${uniqueTimes[0]}`;
+    return `${dayKeys.slice(0, 2).map(d => d.toUpperCase()).join(", ")} +${entries.length - 2}  ${uniqueTimes[0]}`;
+  }
+
+  const shown = entries
+    .slice(0, 2)
+    .map(([d, h]) => `${d.slice(0, 3).toUpperCase()}: ${h}`)
+    .join("  ·  ");
+  return entries.length > 2 ? `${shown}  +${entries.length - 2}` : shown;
+}
+
 const DOC_BADGE: Record<DocumentationRequired, { label: string; className: string }> = {
   none:              { label: "NO DOCS REQUIRED",           className: "text-green-400 bg-green-500/10 border-green-500/20" },
   id_only:           { label: "ID ONLY",                    className: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
@@ -46,7 +71,10 @@ export function ResourceCard({ resource: r, compact, selected, onClick }: Resour
           >
             {cat.label}
           </div>
-          <h3 className="font-sans text-[14px] font-semibold text-content-primary leading-tight truncate">
+          <h3 className={cn(
+            "font-sans text-[14px] font-semibold text-content-primary leading-tight",
+            compact ? "truncate" : "line-clamp-2"
+          )}>
             {r.name}
           </h3>
         </div>
@@ -104,13 +132,8 @@ export function ResourceCard({ resource: r, compact, selected, onClick }: Resour
         )}
         {!compact && r.hours && Object.keys(r.hours).length > 0 && (
           <div className="flex items-start gap-2 font-mono text-[11px] md:text-[10px] text-content-secondary">
-            <dt className="text-content-muted mt-px" aria-hidden="true">◷</dt>
-            <dd className="leading-snug">
-              {Object.entries(r.hours)
-                .filter(([, h]) => h)
-                .map(([d, h]) => `${d}: ${h}`)
-                .join(" · ")}
-            </dd>
+            <dt className="text-content-muted mt-px flex-shrink-0" aria-hidden="true">◷</dt>
+            <dd className="leading-snug">{formatHours(r.hours)}</dd>
           </div>
         )}
         {!compact && r.languages && r.languages.length > 0 && (

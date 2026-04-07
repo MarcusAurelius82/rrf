@@ -62,6 +62,7 @@ interface MapViewProps {
   searchQuery?: string;
   onSearch?: (query: string) => void;
   onMapTap?: () => void;
+  flyToCoords?: [number, number] | null;
 }
 
 const STATE_CENTROIDS: Record<string, [number, number]> = {
@@ -282,6 +283,7 @@ export function MapView({
   searchQuery,
   onSearch,
   onMapTap,
+  flyToCoords,
 }: MapViewProps) {
   const { theme } = useTheme();
   const mapContainer   = useRef<HTMLDivElement>(null);
@@ -432,7 +434,13 @@ export function MapView({
     if (!coord) return;
     const zoom = map.current.getZoom();
     if (zoom < 8 || !map.current.getBounds()?.contains(coord as mapboxgl.LngLatLike)) {
-      map.current.flyTo({ center: coord, zoom: Math.max(zoom, 10), duration: 800 });
+      const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+      map.current.flyTo({
+        center: coord,
+        zoom: Math.max(zoom, 10),
+        duration: 800,
+        ...(isMobile ? { padding: { top: 80, bottom: 260, left: 16, right: 16 } } : {}),
+      });
     }
   }, [selectedResourceId, mapLoaded, resources]);
 
@@ -453,6 +461,19 @@ export function MapView({
     if (!coords) return;
     map.current.flyTo({ center: coords, zoom: 5.0, duration: 1000, essential: true });
   }, [selectedState, mapLoaded]);
+
+  // ── Fly to location search result (city/zip geocode) ──────────────────────
+  useEffect(() => {
+    if (!map.current || !mapLoaded || !flyToCoords) return;
+    const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+    map.current.flyTo({
+      center: flyToCoords,
+      zoom: 11,
+      duration: 900,
+      essential: true,
+      ...(isMobile ? { padding: { top: 80, bottom: 260, left: 16, right: 16 } } : {}),
+    });
+  }, [flyToCoords, mapLoaded]);
 
   const latStr = `${Math.abs(mapCenter.lat).toFixed(2)}°${mapCenter.lat >= 0 ? "N" : "S"}`;
   const lngStr = `${Math.abs(mapCenter.lng).toFixed(2)}°${mapCenter.lng >= 0 ? "E" : "W"}`;

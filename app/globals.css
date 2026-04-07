@@ -139,8 +139,8 @@ body.drawer-open { overflow: hidden; }
   top: 8px !important;
   right: 8px !important;
   border-radius: 6px !important;
-  background: rgba(255,255,255,0.08) !important;
-  color: #888 !important;
+  background: var(--border-default) !important;
+  color: var(--text-secondary) !important;
   font-size: 14px !important;
   line-height: 1 !important;
   display: flex !important;
@@ -149,8 +149,8 @@ body.drawer-open { overflow: hidden; }
   transition: background 0.15s, color 0.15s !important;
 }
 .mapboxgl-popup-close-button:hover {
-  background: rgba(255,255,255,0.16) !important;
-  color: #fff !important;
+  background: var(--border-active) !important;
+  color: var(--text-primary) !important;
 }
 
 .mapboxgl-ctrl-group {
@@ -171,7 +171,15 @@ html[data-theme="light"] .mapboxgl-ctrl-attrib-inner a {
   color: #555 !important;
 }
 
+/* Push Mapbox attribution/logo above our custom status bar */
+.mapboxgl-ctrl-bottom-left,
+.mapboxgl-ctrl-bottom-right {
+  bottom: 36px !important;
+}
+
 /* Hide status bar on landscape phones where vertical space is critical */
 @media (max-height: 480px) {
   [data-status-bar] { display: none !important; }
+  .mapboxgl-ctrl-bottom-left,
+  .mapboxgl-ctrl-bottom-right { bottom: 0 !important; }
 }

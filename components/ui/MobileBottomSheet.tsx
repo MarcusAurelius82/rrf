@@ -39,11 +39,14 @@ export function MobileBottomSheet({
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-20 pointer-events-none">
       {/* Fade gradient into the sheet */}
-      <div className="h-10 bg-gradient-to-t from-surface-0/80 to-transparent" />
+      <div
+        className="h-10 pointer-events-none"
+        style={{ background: "linear-gradient(to top, var(--surface-0) 0%, transparent 100%)" }}
+      />
 
       {/* Sheet content */}
       <div
-        className="bg-surface-0/95 backdrop-blur-sm border-t border-border pointer-events-auto"
+        className="bg-surface-0 border-t border-border pointer-events-auto shadow-2xl"
         onTouchStart={e => { touchStartY.current = e.touches[0].clientY; }}
         onTouchEnd={e => {
           if (touchStartY.current === null) return;

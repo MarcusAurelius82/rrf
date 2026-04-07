@@ -11,6 +11,16 @@ import { Resource, ResourceCategory } from "@/types";
 import { CATEGORY_CONFIG } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export default function MapPage() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [filteredResources, setFilteredResources] = useState<Resource[]>([]);
@@ -21,6 +31,7 @@ export default function MapPage() {
   const [currentLang, setCurrentLang] = useState("EN");
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
   const [bottomSheetCollapsed, setBottomSheetCollapsed] = useState(false);
+  const [flyToCoords, setFlyToCoords] = useState<[number, number] | null>(null);
 
   // Mobile drawer state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -72,6 +83,17 @@ export default function MapPage() {
     finally { setIsLoading(false); }
   }
 
+  // Location search (city/zip) — sort resources by proximity, fly map there
+  function handleLocationSearch(coords: [number, number], label: string) {
+    const [lng, lat] = coords;
+    setFlyToCoords(coords);
+    setSearchQuery(label);
+    const sorted = [...resources].sort((a, b) =>
+      haversineKm(lat, lng, a.lat, a.lng) - haversineKm(lat, lng, b.lat, b.lng)
+    );
+    setFilteredResources(sorted);
+  }
+
   const handleSelectState = useCallback((state: string) => {
     setSelectedState(state);
   }, []);
@@ -94,16 +116,16 @@ export default function MapPage() {
         {/* Mobile overlay backdrop — sidebar only */}
         {mobileSidebarOpen && (
           <div
-            className="md:hidden fixed inset-0 bg-black/60 z-30"
+            className="md:hidden fixed top-[52px] inset-x-0 bottom-0 bg-black/60 z-30"
             aria-hidden="true"
             onClick={() => setMobileSidebarOpen(false)}
           />
         )}
 
-        {/* Sidebar — desktop: static, mobile: fixed left drawer */}
+        {/* Sidebar — desktop: static, mobile: fixed left drawer below navbar */}
         <div
           className={cn(
-            "fixed md:relative inset-y-0 left-0 z-40 md:z-auto transition-transform duration-200 ease-in-out w-full md:w-auto",
+            "fixed top-[52px] bottom-0 md:relative md:top-auto md:bottom-auto md:inset-y-0 left-0 z-40 md:z-auto transition-transform duration-200 ease-in-out w-full md:w-auto",
             mobileSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
           )}
         >
@@ -128,6 +150,7 @@ export default function MapPage() {
           selectedResourceId={selectedResourceId}
           onSelectResource={handleSelectResource}
           onMapTap={() => setBottomSheetCollapsed(true)}
+          flyToCoords={flyToCoords}
         />
 
         {/* Mobile search bar — floats over map, leaves room for hamburger button */}
@@ -136,12 +159,13 @@ export default function MapPage() {
             resources={resources}
             value={searchQuery}
             onSearch={handleSearch}
+            onLocationSearch={handleLocationSearch}
             placeholder="Search shelter, food, legal aid…"
           />
         </div>
 
-        {/* Resource panel — desktop only */}
-        <div className="hidden md:block relative">
+        {/* Resource panel — large screens only (1024px+) */}
+        <div className="hidden lg:block relative">
           <ResourcePanel
             resources={filteredResources}
             selectedState={selectedState}

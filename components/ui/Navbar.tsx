@@ -122,11 +122,13 @@ export function Navbar({ onLanguageChange, currentLang = "EN" }: NavbarProps) {
           <UserButton afterSignOutUrl="/map" appearance={{ baseTheme: undefined }} />
         </SignedIn>
         <SignedOut>
-          <SignInButton mode="modal">
-            <button className="font-mono text-[10px] font-semibold text-content-secondary px-2.5 py-1.5 rounded-md border border-border hover:border-border-active hover:text-content-primary transition-all">
-              SIGN IN
-            </button>
-          </SignInButton>
+          <span className="hidden md:inline-flex">
+            <SignInButton mode="modal">
+              <button className="font-mono text-[10px] font-semibold text-content-secondary px-2.5 py-1.5 rounded-md border border-border hover:border-border-active hover:text-content-primary transition-all">
+                SIGN IN
+              </button>
+            </SignInButton>
+          </span>
         </SignedOut>
 
         {/* Mobile hamburger */}

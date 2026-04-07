@@ -63,7 +63,7 @@ export function SearchInput({
         aria-label={label}
         autoComplete="off"
         style={{ fontSize: 16 }}
-        className="w-full bg-[#111] border border-white/[0.08] rounded-md px-3 py-2 font-mono text-white placeholder-[#444] outline-none focus:border-white/20 focus-visible:ring-1 focus-visible:ring-white/20 transition-all pr-16"
+        className="w-full bg-surface-1 border border-border rounded-md px-3 py-2 font-mono text-content-primary placeholder-content-muted outline-none focus:border-border-active focus-visible:ring-1 focus-visible:ring-accent/30 transition-all pr-16"
       />
       {aiEnabled && (
         <div
