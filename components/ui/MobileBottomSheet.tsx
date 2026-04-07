@@ -1,4 +1,5 @@
 "use client";
+import { useRef, useEffect } from "react";
 import { Resource, ResourceCategory } from "@/types";
 import { CATEGORY_CONFIG } from "@/lib/utils";
 import { ResourceCard } from "./ResourceCard";
@@ -9,6 +10,8 @@ interface MobileBottomSheetProps {
   activeCategory: ResourceCategory | null;
   onCategoryChange: (cat: ResourceCategory | null) => void;
   isLoading?: boolean;
+  selectedResourceId?: string | null;
+  onSelectResource?: (id: string) => void;
 }
 
 export function MobileBottomSheet({
@@ -16,7 +19,18 @@ export function MobileBottomSheet({
   activeCategory,
   onCategoryChange,
   isLoading,
+  selectedResourceId,
+  onSelectResource,
 }: MobileBottomSheetProps) {
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Scroll selected card into view when selection changes (e.g. from map pin tap)
+  useEffect(() => {
+    if (!selectedResourceId) return;
+    const el = cardRefs.current.get(selectedResourceId);
+    el?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [selectedResourceId]);
+
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-20 pointer-events-none">
       {/* Fade gradient into the sheet */}
@@ -72,8 +86,17 @@ export function MobileBottomSheet({
             </div>
           ) : (
             resources.slice(0, 20).map((r) => (
-              <div key={r.id} className="flex-shrink-0 w-[220px]">
-                <ResourceCard resource={r} compact />
+              <div
+                key={r.id}
+                className="flex-shrink-0 w-[220px]"
+                ref={el => { if (el) cardRefs.current.set(r.id, el); else cardRefs.current.delete(r.id); }}
+              >
+                <ResourceCard
+                  resource={r}
+                  compact
+                  selected={selectedResourceId === r.id}
+                  onClick={onSelectResource ? () => onSelectResource(r.id) : undefined}
+                />
               </div>
             ))
           )}

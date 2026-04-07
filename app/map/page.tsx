@@ -150,6 +150,8 @@ export default function MapPage() {
         activeCategory={activeCategory}
         onCategoryChange={setActiveCategory}
         isLoading={isLoading}
+        selectedResourceId={selectedResourceId}
+        onSelectResource={setSelectedResourceId}
       />
 
       {/* Report Missing Resource modal */}
