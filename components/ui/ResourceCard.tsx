@@ -78,49 +78,50 @@ export function ResourceCard({ resource: r, compact, selected, onClick }: Resour
       </div>
 
       {/* Details */}
-      {!compact && (
-        <dl className="space-y-1.5 mb-3">
-          <div className="flex items-start gap-2 font-mono text-[11px] md:text-[10px] text-content-secondary">
-            <dt className="text-content-muted mt-px flex-shrink-0" aria-hidden="true">⊙</dt>
-            <dd className="leading-tight">
-              <address className="not-italic">{r.address}, {r.city}, {r.state}</address>
+      <dl className="space-y-1.5 mb-3">
+        <div className="flex items-start gap-2 font-mono text-[11px] md:text-[10px] text-content-secondary">
+          <dt className="text-content-muted mt-px flex-shrink-0" aria-hidden="true">⊙</dt>
+          <dd className="leading-tight">
+            <address className="not-italic">
+              {compact ? `${r.city}, ${r.state}` : `${r.address}, ${r.city}, ${r.state}`}
+            </address>
+          </dd>
+        </div>
+        {r.phone && (
+          <div className="flex items-center gap-2 font-mono text-[10px] text-content-secondary">
+            <dt className="text-content-muted" aria-hidden="true">☎</dt>
+            <dd>
+              <a
+                href={`tel:${r.phone.replace(/\D/g, "")}`}
+                className="hover:text-content-primary transition-colors"
+                aria-label={`Call ${r.name}: ${r.phone}`}
+                onClick={e => e.stopPropagation()}
+              >
+                {r.phone}
+              </a>
             </dd>
           </div>
-          {r.phone && (
-            <div className="flex items-center gap-2 font-mono text-[10px] text-content-secondary">
-              <dt className="text-content-muted" aria-hidden="true">☎</dt>
-              <dd>
-                <a
-                  href={`tel:${r.phone.replace(/\D/g, "")}`}
-                  className="hover:text-content-primary transition-colors"
-                  aria-label={`Call ${r.name}: ${r.phone}`}
-                >
-                  {r.phone}
-                </a>
-              </dd>
-            </div>
-          )}
-          {r.hours && Object.keys(r.hours).length > 0 && (
-            <div className="flex items-start gap-2 font-mono text-[11px] md:text-[10px] text-content-secondary">
-              <dt className="text-content-muted mt-px" aria-hidden="true">◷</dt>
-              <dd className="leading-snug">
-                {Object.entries(r.hours)
-                  .filter(([, h]) => h)
-                  .map(([d, h]) => `${d}: ${h}`)
-                  .join(" · ")}
-              </dd>
-            </div>
-          )}
-          {r.languages && r.languages.length > 0 && (
-            <div className="flex items-center gap-2 font-mono text-[10px] text-content-secondary">
-              <dt className="text-content-muted" aria-hidden="true">◈</dt>
-              <dd aria-label={`Languages: ${r.languages.join(", ")}`}>
-                {r.languages.join(", ")}
-              </dd>
-            </div>
-          )}
-        </dl>
-      )}
+        )}
+        {!compact && r.hours && Object.keys(r.hours).length > 0 && (
+          <div className="flex items-start gap-2 font-mono text-[11px] md:text-[10px] text-content-secondary">
+            <dt className="text-content-muted mt-px" aria-hidden="true">◷</dt>
+            <dd className="leading-snug">
+              {Object.entries(r.hours)
+                .filter(([, h]) => h)
+                .map(([d, h]) => `${d}: ${h}`)
+                .join(" · ")}
+            </dd>
+          </div>
+        )}
+        {!compact && r.languages && r.languages.length > 0 && (
+          <div className="flex items-center gap-2 font-mono text-[10px] text-content-secondary">
+            <dt className="text-content-muted" aria-hidden="true">◈</dt>
+            <dd aria-label={`Languages: ${r.languages.join(", ")}`}>
+              {r.languages.join(", ")}
+            </dd>
+          </div>
+        )}
+      </dl>
 
       {/* CTA */}
       <a
