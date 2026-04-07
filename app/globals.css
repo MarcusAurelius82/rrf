@@ -110,6 +110,10 @@ select option {
 /* Mobile: prevent body scroll when a drawer is open */
 body.drawer-open { overflow: hidden; }
 
+/* Hide scrollbar for horizontal scroll rows (mobile bottom sheet) */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
 /* ── Mapbox overrides ─────────────────────────────────────────────────────── */
 
 /* Prevent default Mapbox pin SVG from rendering on custom marker elements */

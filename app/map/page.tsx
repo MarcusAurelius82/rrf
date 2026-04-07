@@ -4,6 +4,7 @@ import { Navbar } from "@/components/ui/Navbar";
 import { Sidebar } from "@/components/ui/Sidebar";
 import { MapView } from "@/components/map/MapView";
 import { ResourcePanel } from "@/components/resources/ResourcePanel";
+import { MobileBottomSheet } from "@/components/ui/MobileBottomSheet";
 import { ReportModal } from "@/components/ui/ReportModal";
 import { Resource, ResourceCategory } from "@/types";
 import { CATEGORY_CONFIG } from "@/lib/utils";
@@ -22,17 +23,16 @@ export default function MapPage() {
 
   // Mobile drawer state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
 
   // Report modal
   const [reportModalOpen, setReportModalOpen] = useState(false);
 
   // Prevent body scroll when a drawer is open on mobile
   useEffect(() => {
-    const open = mobileSidebarOpen || mobilePanelOpen || reportModalOpen;
+    const open = mobileSidebarOpen || reportModalOpen;
     document.body.classList.toggle("drawer-open", open);
     return () => document.body.classList.remove("drawer-open");
-  }, [mobileSidebarOpen, mobilePanelOpen, reportModalOpen]);
+  }, [mobileSidebarOpen, reportModalOpen]);
 
   // Fetch resources on mount and when state/category changes
   useEffect(() => {
@@ -81,27 +81,23 @@ export default function MapPage() {
   const handleSelectState = useCallback((state: string) => {
     setSelectedState(state);
     setAiSummary(undefined);
-    // On mobile, open the resource panel when a state is selected
-    setMobilePanelOpen(true);
   }, []);
 
   const categoryCounts = Object.fromEntries(
     Object.keys(CATEGORY_CONFIG).map(cat => [cat, resources.filter(r => r.category === cat).length])
   );
 
-  const hasOverlay = mobileSidebarOpen || mobilePanelOpen;
-
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       <Navbar currentLang={currentLang} onLanguageChange={setCurrentLang} />
 
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Mobile overlay backdrop */}
-        {hasOverlay && (
+        {/* Mobile overlay backdrop — sidebar only */}
+        {mobileSidebarOpen && (
           <div
             className="md:hidden fixed inset-0 bg-black/60 z-30"
             aria-hidden="true"
-            onClick={() => { setMobileSidebarOpen(false); setMobilePanelOpen(false); }}
+            onClick={() => setMobileSidebarOpen(false)}
           />
         )}
 
@@ -128,18 +124,12 @@ export default function MapPage() {
           onSelectState={handleSelectState}
           activeCategory={activeCategory}
           onMobileSidebarToggle={() => setMobileSidebarOpen(true)}
-          onMobilePanelToggle={() => setMobilePanelOpen(true)}
           selectedResourceId={selectedResourceId}
           onSelectResource={setSelectedResourceId}
         />
 
-        {/* Resource panel — desktop: static, mobile: fixed right drawer */}
-        <div
-          className={cn(
-            "fixed md:relative inset-y-0 right-0 z-40 md:z-auto transition-transform duration-200 ease-in-out",
-            mobilePanelOpen ? "translate-x-0" : "translate-x-full md:translate-x-0"
-          )}
-        >
+        {/* Resource panel — desktop only */}
+        <div className="hidden md:block relative">
           <ResourcePanel
             resources={filteredResources}
             selectedState={selectedState}
@@ -148,12 +138,21 @@ export default function MapPage() {
             onSearch={handleSearch}
             searchQuery={searchQuery}
             onSearchChange={val => { setSearchQuery(val); if (!val) setAiSummary(undefined); }}
-            onClose={() => setMobilePanelOpen(false)}
             selectedResourceId={selectedResourceId}
             onSelectResource={setSelectedResourceId}
           />
         </div>
       </div>
+
+      {/* Mobile bottom sheet — category pills + horizontal card scroll */}
+      <MobileBottomSheet
+        resources={filteredResources}
+        activeCategory={activeCategory}
+        onCategoryChange={setActiveCategory}
+        isLoading={isLoading}
+        selectedResourceId={selectedResourceId}
+        onSelectResource={setSelectedResourceId}
+      />
 
       {/* Report Missing Resource modal */}
       {reportModalOpen && (
