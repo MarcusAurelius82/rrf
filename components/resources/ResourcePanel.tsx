@@ -94,8 +94,7 @@ export function ResourcePanel({
           value={searchQuery}
           onChange={onSearchChange}
           onSearch={onSearch}
-          aiEnabled
-          placeholder="Search resources… (AI-powered)"
+          placeholder="Search resources…"
         />
         {/* Documentation filter */}
         <div className="mt-2.5 flex flex-col xs:flex-row gap-1.5" role="group" aria-label="Filter by documentation requirement">
@@ -116,21 +115,6 @@ export function ResourcePanel({
           ))}
         </div>
       </div>
-
-      {/* AI Summary */}
-      {aiSummary && (
-        <div
-          className="mx-3 mt-3 px-3 py-2.5 rounded-lg bg-accent-dim border border-accent-border flex-shrink-0"
-          role="status"
-          aria-label="AI search summary"
-          aria-live="polite"
-        >
-          <div className="font-mono text-[8px] font-bold text-accent tracking-[0.12em] mb-1" aria-hidden="true">
-            AI SUMMARY
-          </div>
-          <p className="font-sans text-[11px] text-content-secondary leading-relaxed">{aiSummary}</p>
-        </div>
-      )}
 
       {/* Resource count */}
       {!isLoading && filteredResources.length > 0 && (
@@ -167,10 +151,21 @@ export function ResourcePanel({
             </div>
           ))
         ) : (
-          <div className="flex flex-col items-center justify-center flex-1 gap-2 text-content-muted">
+          <div className="flex flex-col items-center justify-center flex-1 gap-3 text-content-muted px-4">
             <div className="text-3xl mb-1" aria-hidden="true">◎</div>
             <div className="font-mono text-[11px] tracking-[0.08em]">NO RESOURCES FOUND</div>
-            <div className="font-mono text-[9px] text-content-faint">SELECT A STATE ON THE MAP</div>
+            <div className="w-full border-t border-border pt-3 flex flex-col gap-1.5">
+              <div className="font-mono text-[8px] text-content-tertiary tracking-[0.1em] mb-1">TRY SEARCHING FOR</div>
+              {["emergency shelter", "free food bank", "legal aid", "medical clinic", "language interpreter"].map(ex => (
+                <button
+                  key={ex}
+                  onClick={() => onSearch(ex)}
+                  className="text-left font-mono text-[10px] text-accent hover:text-accent-hover tracking-[0.06em] py-0.5 transition-colors"
+                >
+                  → {ex}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>

@@ -12,6 +12,7 @@ interface MobileBottomSheetProps {
   isLoading?: boolean;
   selectedResourceId?: string | null;
   onSelectResource?: (id: string) => void;
+  collapsed?: boolean;
 }
 
 export function MobileBottomSheet({
@@ -21,6 +22,7 @@ export function MobileBottomSheet({
   isLoading,
   selectedResourceId,
   onSelectResource,
+  collapsed = false,
 }: MobileBottomSheetProps) {
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -74,8 +76,11 @@ export function MobileBottomSheet({
           )}
         </div>
 
-        {/* Horizontal cards row */}
-        <div className="flex gap-3 overflow-x-auto no-scrollbar px-3 pb-5">
+        {/* Horizontal cards row — slides away when map is tapped */}
+        <div className={cn(
+          "flex gap-3 overflow-x-auto no-scrollbar px-3 transition-all duration-300 ease-in-out",
+          collapsed ? "max-h-0 pb-0 opacity-0 overflow-hidden" : "max-h-[300px] pb-5 opacity-100"
+        )}>
           {isLoading ? (
             <div className="font-mono text-[11px] text-content-muted animate-pulse py-3 px-1 tracking-[0.1em]">
               LOADING...

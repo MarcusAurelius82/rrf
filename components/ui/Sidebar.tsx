@@ -3,6 +3,7 @@ import { useRef } from "react";
 import { cn } from "@/lib/utils";
 import { CATEGORY_CONFIG } from "@/lib/utils";
 import { ResourceCategory } from "@/types";
+import { SearchInput } from "./SearchInput";
 
 interface SidebarProps {
   activeCategory: ResourceCategory | null;
@@ -10,6 +11,8 @@ interface SidebarProps {
   categoryCounts: Record<string, number>;
   onReportMissing: () => void;
   onClose?: () => void;
+  searchQuery?: string;
+  onSearch?: (query: string) => void;
 }
 
 export function Sidebar({
@@ -18,6 +21,8 @@ export function Sidebar({
   categoryCounts,
   onReportMissing,
   onClose,
+  searchQuery = "",
+  onSearch,
 }: SidebarProps) {
   const touchStartX = useRef<number | null>(null);
 
@@ -48,6 +53,18 @@ export function Sidebar({
       )}
 
       <div className="px-3.5 pb-4">
+        {/* Search input */}
+        {onSearch && (
+          <div className="mb-3">
+            <SearchInput
+              value={searchQuery}
+              onChange={onSearch}
+              onSearch={onSearch}
+              placeholder="Search resources…"
+            />
+          </div>
+        )}
+
         <div className="font-mono text-[11px] md:text-[9px] font-semibold text-content-muted tracking-[0.12em] mb-1" aria-hidden="true">
           RESOURCES
         </div>

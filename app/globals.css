@@ -128,6 +128,11 @@ body.drawer-open { overflow: hidden; }
 
 .mapboxgl-popup-tip { display: none !important; }
 
+/* Hide zoom buttons on mobile — replaced by pinch-to-zoom */
+@media (max-width: 767px) {
+  .mapboxgl-ctrl-top-right .mapboxgl-ctrl-group { display: none !important; }
+}
+
 .mapboxgl-popup-close-button {
   width: 24px !important;
   height: 24px !important;

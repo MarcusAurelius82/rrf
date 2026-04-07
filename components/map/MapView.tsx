@@ -5,6 +5,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { Resource, ResourceCategory } from "@/types";
 import { CATEGORY_CONFIG, cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
+import { SearchInput } from "@/components/ui/SearchInput";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
 
@@ -59,6 +60,9 @@ interface MapViewProps {
   mobilePanelOpen?: boolean;
   selectedResourceId?: string | null;
   onSelectResource?: (id: string | null) => void;
+  searchQuery?: string;
+  onSearch?: (query: string) => void;
+  onMapTap?: () => void;
 }
 
 const STATE_CENTROIDS: Record<string, [number, number]> = {
@@ -276,6 +280,9 @@ export function MapView({
   mobilePanelOpen,
   selectedResourceId,
   onSelectResource,
+  searchQuery,
+  onSearch,
+  onMapTap,
 }: MapViewProps) {
   const { theme } = useTheme();
   const mapContainer   = useRef<HTMLDivElement>(null);
@@ -284,6 +291,8 @@ export function MapView({
   const geocodingRef   = useRef(false);
   const onSelectRef    = useRef(onSelectState);
   onSelectRef.current  = onSelectState; // always latest without re-init
+  const onMapTapRef    = useRef(onMapTap);
+  onMapTapRef.current  = onMapTap;
 
   const [mapLoaded, setMapLoaded] = useState(false);
   const [clicking, setClicking]   = useState(false);
@@ -336,7 +345,7 @@ export function MapView({
       setMapCenter({ lat: c.lat, lng: c.lng });
     });
 
-    // Click map → reverse-geocode → select state
+    // Click map → reverse-geocode → select state; collapse bottom sheet if not on a pin
     map.current.on("click", async (e) => {
       if (geocodingRef.current) return;
       const { lng, lat } = e.lngLat;
@@ -344,6 +353,13 @@ export function MapView({
         lng < US_BOUNDS[0][0] || lng > US_BOUNDS[1][0] ||
         lat < US_BOUNDS[0][1] || lat > US_BOUNDS[1][1]
       ) return;
+
+      // Only collapse the bottom sheet when tapping empty map (not a pin)
+      const pinFeatures = map.current?.queryRenderedFeatures(e.point, {
+        layers: ["resource-pins", "clusters"],
+      });
+      if (!pinFeatures?.length) onMapTapRef.current?.();
+
       geocodingRef.current = true;
       setClicking(true);
       try {
@@ -444,8 +460,8 @@ export function MapView({
 
   return (
     <div className="relative flex-1 overflow-hidden" role="region" aria-label="Interactive resource map">
-      {/* Map header overlay */}
-      <div className="absolute top-4 left-4 z-10 pointer-events-none">
+      {/* Map header overlay — desktop only (mobile shows search bar instead) */}
+      <div className="hidden md:block absolute top-4 left-4 z-10 pointer-events-none">
         <div className="font-mono text-[9px] text-content-muted tracking-[0.12em] mb-1" aria-hidden="true">
           ACTIVE SECTOR
         </div>
@@ -484,15 +500,23 @@ export function MapView({
         </div>
       )}
 
-      {/* Mobile toggle buttons */}
-      <div className="md:hidden absolute top-4 right-4 z-10 flex flex-col gap-2">
+      {/* Mobile: search bar at top of map + hamburger button */}
+      <div className="md:hidden absolute top-3 left-3 right-3 z-10 flex items-center gap-2">
+        <div className="flex-1">
+          <SearchInput
+            value={searchQuery ?? ""}
+            onChange={onSearch ?? (() => {})}
+            onSearch={onSearch}
+            placeholder="Search shelter, food, legal aid…"
+          />
+        </div>
         {onMobileSidebarToggle && (
           <button
             onClick={onMobileSidebarToggle}
             aria-label={mobileSidebarOpen ? "Close filters" : "Open filters"}
             aria-pressed={mobileSidebarOpen}
             className={cn(
-              "w-10 h-10 flex items-center justify-center rounded-lg border backdrop-blur-sm text-content-primary text-[13px] transition-all",
+              "flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg border backdrop-blur-sm text-content-primary text-[13px] transition-all",
               mobileSidebarOpen
                 ? "bg-surface-2 border-accent ring-2 ring-accent"
                 : "bg-surface-0/80 border-border-active hover:bg-surface-2"
@@ -501,22 +525,12 @@ export function MapView({
             ☰
           </button>
         )}
-        {onMobilePanelToggle && (
-          <button
-            onClick={onMobilePanelToggle}
-            aria-label={mobilePanelOpen ? "Close resource list" : "Open resource list"}
-            aria-pressed={mobilePanelOpen}
-            className={cn(
-              "w-10 h-10 flex items-center justify-center rounded-lg border backdrop-blur-sm font-mono text-[9px] font-bold text-content-primary transition-all leading-none",
-              mobilePanelOpen
-                ? "bg-surface-2 border-accent ring-2 ring-accent"
-                : "bg-surface-0/80 border-border-active hover:bg-surface-2"
-            )}
-          >
-            LIST
-          </button>
-        )}
       </div>
+
+      {/* Desktop: mobile-only sidebar toggle (unused on desktop) */}
+      {onMobileSidebarToggle && (
+        <div className="hidden" aria-hidden="true" />
+      )}
 
       {/* Map container */}
       <div ref={mapContainer} className="w-full h-full" aria-hidden="true" />

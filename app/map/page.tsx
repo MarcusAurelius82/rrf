@@ -16,10 +16,10 @@ export default function MapPage() {
   const [selectedState, setSelectedState] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<ResourceCategory | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [aiSummary, setAiSummary] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(false);
   const [currentLang, setCurrentLang] = useState("EN");
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
+  const [bottomSheetCollapsed, setBottomSheetCollapsed] = useState(false);
 
   // Mobile drawer state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -34,7 +34,7 @@ export default function MapPage() {
     return () => document.body.classList.remove("drawer-open");
   }, [mobileSidebarOpen, reportModalOpen]);
 
-  // Fetch resources nationwide — state selection only flies the map, never filters the data
+  // Fetch resources nationwide — state selection only flies the map
   useEffect(() => {
     setIsLoading(true);
     const params = new URLSearchParams();
@@ -42,44 +42,43 @@ export default function MapPage() {
 
     fetch(`/api/resources?${params}`)
       .then(r => r.json())
-      .then(({ data }) => { setResources(data || []); setFilteredResources(data || []); })
+      .then(({ data }) => {
+        setResources(data || []);
+        setFilteredResources(data || []);
+        setSearchQuery(""); // clear search when base data changes
+      })
       .catch(console.error)
       .finally(() => setIsLoading(false));
   }, [activeCategory]);
 
-  // Client-side filter
-  useEffect(() => {
-    let result = resources;
-    if (activeCategory) result = result.filter(r => r.category === activeCategory);
-    if (searchQuery && !aiSummary) {
-      result = result.filter(r =>
-        r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.address.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-    setFilteredResources(result);
-  }, [resources, activeCategory, searchQuery, aiSummary]);
-
-  // AI search
+  // Full-text search via Postgres
   async function handleSearch(query: string) {
-    if (!query.trim()) { setAiSummary(undefined); return; }
+    setSearchQuery(query);
+    if (!query.trim()) {
+      setFilteredResources(resources);
+      return;
+    }
     setIsLoading(true);
     try {
       const res = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, state: selectedState, category: activeCategory }),
+        body: JSON.stringify({ query, category: activeCategory }),
       });
       const { data } = await res.json();
       setFilteredResources(data?.resources || []);
-      setAiSummary(data?.ai_summary);
     } catch (err) { console.error(err); }
     finally { setIsLoading(false); }
   }
 
   const handleSelectState = useCallback((state: string) => {
     setSelectedState(state);
-    setAiSummary(undefined);
+  }, []);
+
+  // Selecting a resource (pin tap) expands the bottom sheet
+  const handleSelectResource = useCallback((id: string | null) => {
+    setSelectedResourceId(id);
+    if (id) setBottomSheetCollapsed(false);
   }, []);
 
   const categoryCounts = Object.fromEntries(
@@ -113,6 +112,8 @@ export default function MapPage() {
             categoryCounts={categoryCounts}
             onReportMissing={() => setReportModalOpen(true)}
             onClose={() => setMobileSidebarOpen(false)}
+            searchQuery={searchQuery}
+            onSearch={handleSearch}
           />
         </div>
 
@@ -124,7 +125,10 @@ export default function MapPage() {
           activeCategory={activeCategory}
           onMobileSidebarToggle={() => setMobileSidebarOpen(o => !o)}
           selectedResourceId={selectedResourceId}
-          onSelectResource={setSelectedResourceId}
+          onSelectResource={handleSelectResource}
+          searchQuery={searchQuery}
+          onSearch={handleSearch}
+          onMapTap={() => setBottomSheetCollapsed(true)}
         />
 
         {/* Resource panel — desktop only */}
@@ -133,12 +137,11 @@ export default function MapPage() {
             resources={filteredResources}
             selectedState={selectedState}
             isLoading={isLoading}
-            aiSummary={aiSummary}
             onSearch={handleSearch}
             searchQuery={searchQuery}
-            onSearchChange={val => { setSearchQuery(val); if (!val) setAiSummary(undefined); }}
+            onSearchChange={handleSearch}
             selectedResourceId={selectedResourceId}
-            onSelectResource={setSelectedResourceId}
+            onSelectResource={handleSelectResource}
           />
         </div>
       </div>
@@ -147,10 +150,11 @@ export default function MapPage() {
       <MobileBottomSheet
         resources={filteredResources}
         activeCategory={activeCategory}
-        onCategoryChange={setActiveCategory}
+        onCategoryChange={cat => { setActiveCategory(cat); setBottomSheetCollapsed(false); }}
         isLoading={isLoading}
         selectedResourceId={selectedResourceId}
-        onSelectResource={setSelectedResourceId}
+        onSelectResource={handleSelectResource}
+        collapsed={bottomSheetCollapsed}
       />
 
       {/* Report Missing Resource modal */}
