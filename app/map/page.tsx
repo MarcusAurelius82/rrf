@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/ui/Sidebar";
 import { MapView } from "@/components/map/MapView";
 import { ResourcePanel } from "@/components/resources/ResourcePanel";
 import { MobileBottomSheet } from "@/components/ui/MobileBottomSheet";
+import { MapSearchInput } from "@/components/ui/MapSearchInput";
 import { ReportModal } from "@/components/ui/ReportModal";
 import { Resource, ResourceCategory } from "@/types";
 import { CATEGORY_CONFIG } from "@/lib/utils";
@@ -126,10 +127,18 @@ export default function MapPage() {
           onMobileSidebarToggle={() => setMobileSidebarOpen(o => !o)}
           selectedResourceId={selectedResourceId}
           onSelectResource={handleSelectResource}
-          searchQuery={searchQuery}
-          onSearch={handleSearch}
           onMapTap={() => setBottomSheetCollapsed(true)}
         />
+
+        {/* Mobile search bar — floats over map, leaves room for hamburger button */}
+        <div className="md:hidden absolute top-3 left-3 right-14 z-20">
+          <MapSearchInput
+            resources={resources}
+            value={searchQuery}
+            onSearch={handleSearch}
+            placeholder="Search shelter, food, legal aid…"
+          />
+        </div>
 
         {/* Resource panel — desktop only */}
         <div className="hidden md:block relative">
@@ -155,6 +164,7 @@ export default function MapPage() {
         selectedResourceId={selectedResourceId}
         onSelectResource={handleSelectResource}
         collapsed={bottomSheetCollapsed}
+        onCollapse={() => setBottomSheetCollapsed(true)}
       />
 
       {/* Report Missing Resource modal */}

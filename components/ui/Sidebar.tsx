@@ -53,9 +53,9 @@ export function Sidebar({
       )}
 
       <div className="px-3.5 pb-4">
-        {/* Search input */}
+        {/* Search input — mobile sidebar only */}
         {onSearch && (
-          <div className="mb-3">
+          <div className="md:hidden mb-3">
             <SearchInput
               value={searchQuery}
               onChange={onSearch}

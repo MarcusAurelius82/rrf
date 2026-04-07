@@ -5,7 +5,6 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { Resource, ResourceCategory } from "@/types";
 import { CATEGORY_CONFIG, cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
-import { SearchInput } from "@/components/ui/SearchInput";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
 
@@ -452,7 +451,7 @@ export function MapView({
     if (!map.current || !mapLoaded || !selectedState) return;
     const coords = STATE_CENTROIDS[selectedState];
     if (!coords) return;
-    map.current.flyTo({ center: coords, zoom: 6.5, duration: 1200, essential: true });
+    map.current.flyTo({ center: coords, zoom: 5.0, duration: 1000, essential: true });
   }, [selectedState, mapLoaded]);
 
   const latStr = `${Math.abs(mapCenter.lat).toFixed(2)}°${mapCenter.lat >= 0 ? "N" : "S"}`;
@@ -500,36 +499,21 @@ export function MapView({
         </div>
       )}
 
-      {/* Mobile: search bar at top of map + hamburger button */}
-      <div className="md:hidden absolute top-3 left-3 right-3 z-10 flex items-center gap-2">
-        <div className="flex-1">
-          <SearchInput
-            value={searchQuery ?? ""}
-            onChange={onSearch ?? (() => {})}
-            onSearch={onSearch}
-            placeholder="Search shelter, food, legal aid…"
-          />
-        </div>
-        {onMobileSidebarToggle && (
-          <button
-            onClick={onMobileSidebarToggle}
-            aria-label={mobileSidebarOpen ? "Close filters" : "Open filters"}
-            aria-pressed={mobileSidebarOpen}
-            className={cn(
-              "flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg border backdrop-blur-sm text-content-primary text-[13px] transition-all",
-              mobileSidebarOpen
-                ? "bg-surface-2 border-accent ring-2 ring-accent"
-                : "bg-surface-0/80 border-border-active hover:bg-surface-2"
-            )}
-          >
-            ☰
-          </button>
-        )}
-      </div>
-
-      {/* Desktop: mobile-only sidebar toggle (unused on desktop) */}
+      {/* Hamburger — mobile only, top-right */}
       {onMobileSidebarToggle && (
-        <div className="hidden" aria-hidden="true" />
+        <button
+          onClick={onMobileSidebarToggle}
+          aria-label={mobileSidebarOpen ? "Close filters" : "Open filters"}
+          aria-pressed={mobileSidebarOpen}
+          className={cn(
+            "md:hidden absolute top-3 right-3 z-10 w-10 h-10 flex items-center justify-center rounded-lg border backdrop-blur-sm text-content-primary text-[13px] transition-all",
+            mobileSidebarOpen
+              ? "bg-surface-2 border-accent ring-2 ring-accent"
+              : "bg-surface-0/80 border-border-active hover:bg-surface-2"
+          )}
+        >
+          ☰
+        </button>
       )}
 
       {/* Map container */}
