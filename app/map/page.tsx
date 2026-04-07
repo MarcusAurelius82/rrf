@@ -104,7 +104,7 @@ export default function MapPage() {
         {/* Sidebar — desktop: static, mobile: fixed left drawer */}
         <div
           className={cn(
-            "fixed md:relative inset-y-0 left-0 z-40 md:z-auto transition-transform duration-200 ease-in-out",
+            "fixed md:relative inset-y-0 left-0 z-40 md:z-auto transition-transform duration-200 ease-in-out w-full md:w-auto",
             mobileSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
           )}
         >
@@ -123,7 +123,7 @@ export default function MapPage() {
           selectedState={selectedState}
           onSelectState={handleSelectState}
           activeCategory={activeCategory}
-          onMobileSidebarToggle={() => setMobileSidebarOpen(true)}
+          onMobileSidebarToggle={() => setMobileSidebarOpen(o => !o)}
           selectedResourceId={selectedResourceId}
           onSelectResource={setSelectedResourceId}
         />

@@ -41,7 +41,7 @@ export function ResourceCard({ resource: r, compact, selected, onClick }: Resour
       <div className="flex items-start justify-between mb-2.5">
         <div className="flex-1 min-w-0">
           <div
-            className="font-mono text-[8px] font-semibold text-content-muted tracking-[0.12em] mb-0.5"
+            className="font-mono text-[9px] md:text-[8px] font-semibold text-content-muted tracking-[0.12em] mb-0.5"
             aria-hidden="true"
           >
             {cat.label}
@@ -63,13 +63,13 @@ export function ResourceCard({ resource: r, compact, selected, onClick }: Resour
       <div className="mb-2.5 flex items-center gap-1.5 flex-wrap">
         <StatusBadge status={r.status} />
         {r.urgent && (
-          <span className="inline-block font-mono text-[8px] font-bold tracking-[0.1em] px-2 py-0.5 rounded text-red-400 bg-red-500/10 border border-red-500/20">
+          <span className="inline-block font-mono text-[9px] md:text-[8px] font-bold tracking-[0.1em] px-2 py-0.5 rounded text-red-400 bg-red-500/10 border border-red-500/20">
             URGENT
           </span>
         )}
         {r.documentation_required && DOC_BADGE[r.documentation_required] && (
           <span className={cn(
-            "inline-block font-mono text-[8px] font-bold tracking-[0.1em] px-2 py-0.5 rounded border",
+            "inline-block font-mono text-[9px] md:text-[8px] font-bold tracking-[0.1em] px-2 py-0.5 rounded border",
             DOC_BADGE[r.documentation_required].className
           )}>
             {DOC_BADGE[r.documentation_required].label}
@@ -80,7 +80,7 @@ export function ResourceCard({ resource: r, compact, selected, onClick }: Resour
       {/* Details */}
       {!compact && (
         <dl className="space-y-1.5 mb-3">
-          <div className="flex items-start gap-2 font-mono text-[10px] text-content-secondary">
+          <div className="flex items-start gap-2 font-mono text-[11px] md:text-[10px] text-content-secondary">
             <dt className="text-content-muted mt-px flex-shrink-0" aria-hidden="true">⊙</dt>
             <dd className="leading-tight">
               <address className="not-italic">{r.address}, {r.city}, {r.state}</address>
@@ -101,7 +101,7 @@ export function ResourceCard({ resource: r, compact, selected, onClick }: Resour
             </div>
           )}
           {r.hours && Object.keys(r.hours).length > 0 && (
-            <div className="flex items-start gap-2 font-mono text-[10px] text-content-secondary">
+            <div className="flex items-start gap-2 font-mono text-[11px] md:text-[10px] text-content-secondary">
               <dt className="text-content-muted mt-px" aria-hidden="true">◷</dt>
               <dd className="leading-snug">
                 {Object.entries(r.hours)
@@ -127,7 +127,7 @@ export function ResourceCard({ resource: r, compact, selected, onClick }: Resour
         href={mapsUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="block w-full py-2 rounded-md bg-accent hover:bg-accent-hover font-mono text-[10px] font-bold tracking-[0.1em] text-white text-center transition-all"
+        className="block w-full py-3 md:py-2 rounded-md bg-accent hover:bg-accent-hover font-mono text-[10px] font-bold tracking-[0.1em] text-white text-center transition-all"
         aria-label={`Get directions to ${r.name}`}
       >
         GET DIRECTIONS

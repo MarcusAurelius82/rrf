@@ -3,7 +3,7 @@ import { useRef, useEffect, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { Resource, ResourceCategory } from "@/types";
-import { CATEGORY_CONFIG } from "@/lib/utils";
+import { CATEGORY_CONFIG, cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
@@ -55,6 +55,8 @@ interface MapViewProps {
   activeCategory: ResourceCategory | null;
   onMobileSidebarToggle?: () => void;
   onMobilePanelToggle?: () => void;
+  mobileSidebarOpen?: boolean;
+  mobilePanelOpen?: boolean;
   selectedResourceId?: string | null;
   onSelectResource?: (id: string | null) => void;
 }
@@ -270,6 +272,8 @@ export function MapView({
   activeCategory,
   onMobileSidebarToggle,
   onMobilePanelToggle,
+  mobileSidebarOpen,
+  mobilePanelOpen,
   selectedResourceId,
   onSelectResource,
 }: MapViewProps) {
@@ -446,7 +450,7 @@ export function MapView({
           ACTIVE SECTOR
         </div>
         <div
-          className="font-mono text-[20px] font-bold tracking-[0.04em] text-content-primary border border-border-active px-3.5 py-2 rounded-md bg-surface-0/80 backdrop-blur-sm"
+          className="font-mono text-[14px] md:text-[20px] font-bold tracking-[0.04em] text-content-primary border border-border-active px-3.5 py-2 rounded-md bg-surface-0/80 backdrop-blur-sm"
           aria-live="polite"
           aria-label={`Viewing: ${selectedState ? `State ${selectedState}` : "National overview"}`}
         >
@@ -464,7 +468,7 @@ export function MapView({
 
       {/* Click-to-select hint */}
       {!selectedState && mapLoaded && (
-        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+        <div className="hidden md:block absolute bottom-12 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
           <div className="font-mono text-[10px] text-content-secondary bg-surface-0/80 border border-border px-3 py-1.5 rounded-full backdrop-blur-sm tracking-[0.08em] whitespace-nowrap">
             {clicking ? "LOCATING…" : "CLICK ANY STATE TO LOAD RESOURCES"}
           </div>
@@ -485,8 +489,14 @@ export function MapView({
         {onMobileSidebarToggle && (
           <button
             onClick={onMobileSidebarToggle}
-            aria-label="Open filters"
-            className="w-10 h-10 flex items-center justify-center rounded-lg bg-surface-0/80 border border-border-active backdrop-blur-sm text-content-primary text-[13px] hover:bg-surface-2 transition-all"
+            aria-label={mobileSidebarOpen ? "Close filters" : "Open filters"}
+            aria-pressed={mobileSidebarOpen}
+            className={cn(
+              "w-10 h-10 flex items-center justify-center rounded-lg border backdrop-blur-sm text-content-primary text-[13px] transition-all",
+              mobileSidebarOpen
+                ? "bg-surface-2 border-accent ring-2 ring-accent"
+                : "bg-surface-0/80 border-border-active hover:bg-surface-2"
+            )}
           >
             ☰
           </button>
@@ -494,8 +504,14 @@ export function MapView({
         {onMobilePanelToggle && (
           <button
             onClick={onMobilePanelToggle}
-            aria-label="Open resource list"
-            className="w-10 h-10 flex items-center justify-center rounded-lg bg-surface-0/80 border border-border-active backdrop-blur-sm font-mono text-[9px] font-bold text-content-primary hover:bg-surface-2 transition-all leading-none"
+            aria-label={mobilePanelOpen ? "Close resource list" : "Open resource list"}
+            aria-pressed={mobilePanelOpen}
+            className={cn(
+              "w-10 h-10 flex items-center justify-center rounded-lg border backdrop-blur-sm font-mono text-[9px] font-bold text-content-primary transition-all leading-none",
+              mobilePanelOpen
+                ? "bg-surface-2 border-accent ring-2 ring-accent"
+                : "bg-surface-0/80 border-border-active hover:bg-surface-2"
+            )}
           >
             LIST
           </button>
@@ -509,10 +525,11 @@ export function MapView({
       <div
         className="absolute bottom-0 left-0 right-0 h-9 flex items-center gap-4 md:gap-6 px-3 md:px-4 border-t border-border bg-surface-0/90 backdrop-blur-sm font-mono text-[10px] text-content-muted tracking-[0.08em]"
         aria-hidden="true"
+        data-status-bar
       >
-        <span>LAT <span className="text-content-secondary">{latStr}</span></span>
-        <span>LON <span className="text-content-secondary">{lngStr}</span></span>
-        {selectedState && <span className="hidden sm:inline">SELECTED <span className="text-content-secondary">{selectedState}</span></span>}
+        <span className="hidden sm:inline">LAT <span className="text-content-secondary">{latStr}</span></span>
+        <span className="hidden sm:inline">LON <span className="text-content-secondary">{lngStr}</span></span>
+        {selectedState && <span>SELECTED <span className="text-content-secondary">{selectedState}</span></span>}
         <span className="ml-auto">STATUS <span className="text-accent">LIVE</span></span>
       </div>
     </div>
