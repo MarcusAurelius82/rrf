@@ -165,6 +165,7 @@ function setupMapLayers(m: mapboxgl.Map) {
     cluster: true,
     clusterMaxZoom: 11,
     clusterRadius: 40,
+    clusterMinPoints: 6,
   });
 
   // Cluster bubble
@@ -439,7 +440,7 @@ export function MapView({
         center: coord,
         zoom: Math.max(zoom, 10),
         duration: 800,
-        ...(isMobile ? { padding: { top: 80, bottom: 260, left: 16, right: 16 } } : {}),
+        ...(isMobile ? { padding: { top: 80, bottom: 180, left: 16, right: 16 } } : {}),
       });
     }
   }, [selectedResourceId, mapLoaded, resources]);
@@ -471,7 +472,7 @@ export function MapView({
       zoom: 11,
       duration: 900,
       essential: true,
-      ...(isMobile ? { padding: { top: 80, bottom: 260, left: 16, right: 16 } } : {}),
+      ...(isMobile ? { padding: { top: 80, bottom: 180, left: 16, right: 16 } } : {}),
     });
   }, [flyToCoords, mapLoaded]);
 

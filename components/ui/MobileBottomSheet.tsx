@@ -40,7 +40,7 @@ export function MobileBottomSheet({
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-20 pointer-events-none">
       {/* Fade gradient into the sheet */}
       <div
-        className="h-10 pointer-events-none"
+        className="h-6 pointer-events-none"
         style={{ background: "linear-gradient(to top, var(--surface-0) 0%, transparent 100%)" }}
       />
 
@@ -99,7 +99,7 @@ export function MobileBottomSheet({
         {/* Horizontal cards row — slides away when map is tapped */}
         <div className={cn(
           "flex gap-3 overflow-x-auto no-scrollbar px-3 transition-all duration-300 ease-in-out",
-          collapsed ? "max-h-0 pb-0 opacity-0 overflow-hidden" : "max-h-[300px] pb-5 opacity-100"
+          collapsed ? "max-h-0 pb-0 opacity-0 overflow-hidden" : "max-h-[200px] pb-4 opacity-100"
         )}>
           {isLoading ? (
             <div className="font-mono text-[11px] text-content-muted animate-pulse py-3 px-1 tracking-[0.1em]">
@@ -113,7 +113,7 @@ export function MobileBottomSheet({
             resources.slice(0, 20).map((r) => (
               <div
                 key={r.id}
-                className="flex-shrink-0 w-[220px]"
+                className="flex-shrink-0 w-[260px]"
                 ref={el => { if (el) cardRefs.current.set(r.id, el); else cardRefs.current.delete(r.id); }}
               >
                 <ResourceCard
