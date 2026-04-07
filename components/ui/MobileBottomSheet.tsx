@@ -34,10 +34,10 @@ export function MobileBottomSheet({
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-20 pointer-events-none">
       {/* Fade gradient into the sheet */}
-      <div className="h-10 bg-gradient-to-t from-[#0a0a0a]/80 to-transparent" />
+      <div className="h-10 bg-gradient-to-t from-surface-0/80 to-transparent" />
 
       {/* Sheet content */}
-      <div className="bg-[#0a0a0a]/95 backdrop-blur-sm border-t border-white/[0.08] pointer-events-auto">
+      <div className="bg-surface-0/95 backdrop-blur-sm border-t border-border pointer-events-auto">
         {/* Category pills */}
         <div className="flex gap-2 overflow-x-auto no-scrollbar px-3 pt-2.5 pb-2">
           <button
