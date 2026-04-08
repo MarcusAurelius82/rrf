@@ -24,13 +24,21 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // DeepL rejects empty strings — filter them out and map results back
+    const nonEmpty = texts.slice(0, 50).map((t, i) => ({ t, i })).filter(({ t }) => t.trim());
+    if (!nonEmpty.length) {
+      return NextResponse.json<ApiResponse<{ translations: string[] }>>({
+        data: { translations: texts },
+      });
+    }
+
     const res = await fetch("https://api-free.deepl.com/v2/translate", {
       method: "POST",
       headers: {
         "Authorization": `DeepL-Auth-Key ${process.env.DEEPL_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ text: texts.slice(0, 50), target_lang }),
+      body: JSON.stringify({ text: nonEmpty.map(({ t }) => t), target_lang }),
     });
 
     if (!res.ok) {
@@ -43,8 +51,11 @@ export async function POST(request: NextRequest) {
     }
 
     const json = await res.json() as { translations: Array<{ text: string }> };
+    // Map translated results back to original positions; empty strings keep original
+    const out = [...texts];
+    nonEmpty.forEach(({ i }, j) => { out[i] = json.translations[j]?.text ?? texts[i]; });
     return NextResponse.json<ApiResponse<{ translations: string[] }>>({
-      data: { translations: json.translations.map(t => t.text) },
+      data: { translations: out },
     });
   } catch (err) {
     console.error("[translate/batch]", err);
