@@ -13,6 +13,7 @@ interface MobileBottomSheetProps {
   isLoading?: boolean;
   selectedResourceId?: string | null;
   onSelectResource?: (id: string) => void;
+  lang?: string;
 }
 
 export function MobileBottomSheet({
@@ -23,6 +24,7 @@ export function MobileBottomSheet({
   isLoading,
   selectedResourceId,
   onSelectResource,
+  lang = "EN",
 }: MobileBottomSheetProps) {
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -103,6 +105,7 @@ export function MobileBottomSheet({
                   compact
                   selected={selectedResourceId === r.id}
                   onClick={onSelectResource ? () => onSelectResource(r.id) : undefined}
+                  lang={lang}
                 />
               </div>
             ))

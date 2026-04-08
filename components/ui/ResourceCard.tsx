@@ -3,6 +3,7 @@ import { DocumentationRequired, Resource } from "@/types";
 import { CATEGORY_CONFIG } from "@/lib/utils";
 import { StatusBadge } from "./StatusBadge";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/hooks/useTranslation";
 
 function formatHours(hours: Record<string, string>): string {
   const entries = Object.entries(hours).filter(([, h]) => h && h.trim());
@@ -42,11 +43,20 @@ interface ResourceCardProps {
   compact?: boolean;
   selected?: boolean;
   onClick?: () => void;
+  lang?: string;
 }
 
-export function ResourceCard({ resource: r, compact, selected, onClick }: ResourceCardProps) {
+export function ResourceCard({ resource: r, compact, selected, onClick, lang = "EN" }: ResourceCardProps) {
   const cat = CATEGORY_CONFIG[r.category];
   const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(`${r.address} ${r.city} ${r.state}`)}`;
+
+  // Translate the content a user needs to navigate to and use the resource
+  const sourceTexts = [
+    r.name,
+    compact ? `${r.city}, ${r.state}` : `${r.address}, ${r.city}, ${r.state}`,
+    r.documentation_required ? (DOC_BADGE[r.documentation_required]?.label ?? "") : "",
+  ];
+  const [tName, tAddress, tDocLabel] = useTranslation(sourceTexts, lang);
 
   return (
     <article
@@ -75,7 +85,7 @@ export function ResourceCard({ resource: r, compact, selected, onClick }: Resour
             "font-sans text-[14px] font-semibold text-content-primary leading-tight",
             compact ? "truncate" : "line-clamp-2"
           )}>
-            {r.name}
+            {tName}
           </h3>
         </div>
         <div
@@ -100,7 +110,7 @@ export function ResourceCard({ resource: r, compact, selected, onClick }: Resour
             "inline-block font-mono text-[9px] md:text-[8px] font-bold tracking-[0.1em] px-2 py-0.5 rounded border",
             DOC_BADGE[r.documentation_required].className
           )}>
-            {DOC_BADGE[r.documentation_required].label}
+            {tDocLabel || DOC_BADGE[r.documentation_required].label}
           </span>
         )}
       </div>
@@ -110,9 +120,7 @@ export function ResourceCard({ resource: r, compact, selected, onClick }: Resour
         <div className="flex items-start gap-2 font-mono text-[11px] md:text-[10px] text-content-secondary">
           <dt className="text-content-muted mt-px flex-shrink-0" aria-hidden="true">⊙</dt>
           <dd className="leading-tight">
-            <address className="not-italic">
-              {compact ? `${r.city}, ${r.state}` : `${r.address}, ${r.city}, ${r.state}`}
-            </address>
+            <address className="not-italic">{tAddress}</address>
           </dd>
         </div>
         {r.phone && (

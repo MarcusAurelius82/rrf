@@ -220,6 +220,7 @@ export default function MapPage() {
             onSearchChange={handleSearch}
             selectedResourceId={selectedResourceId}
             onSelectResource={handleSelectResource}
+            lang={currentLang}
           />
         </div>
       </div>
@@ -233,6 +234,7 @@ export default function MapPage() {
         isLoading={isLoading}
         selectedResourceId={selectedResourceId}
         onSelectResource={handleSelectResource}
+        lang={currentLang}
       />
 
       {/* Report Missing Resource modal */}

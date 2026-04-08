@@ -25,6 +25,7 @@ interface ResourcePanelProps {
   onClose?: () => void;
   selectedResourceId?: string | null;
   onSelectResource?: (id: string) => void;
+  lang?: string;
 }
 
 export function ResourcePanel({
@@ -39,6 +40,7 @@ export function ResourcePanel({
   onClose,
   selectedResourceId,
   onSelectResource,
+  lang = "EN",
 }: ResourcePanelProps) {
   const [docFilter, setDocFilter] = useState<DocFilter>("all");
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -149,6 +151,7 @@ export function ResourcePanel({
                 resource={r}
                 selected={selectedResourceId === r.id}
                 onClick={onSelectResource ? () => onSelectResource(r.id) : undefined}
+                lang={lang}
               />
             </div>
           ))
