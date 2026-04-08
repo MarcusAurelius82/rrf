@@ -46,6 +46,13 @@ export const UI_STRINGS = {
   FILTERS:          "FILTERS",
   SUPPORT:          "SUPPORT",
   FAQ:              "FAQ",
+  // Search
+  SEARCH_PLACEHOLDER:     "Search resources…",
+  SEARCH_MAP_PLACEHOLDER: "Search shelter, food, legal aid…",
+  NEARBY:                 "NEARBY",
+  SUGG_NEARBY:            "search nearby",
+  SUGG_CITY:              "city",
+  SUGG_CATEGORY:          "category",
 } as const;
 
 export type UIKey = keyof typeof UI_STRINGS;

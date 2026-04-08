@@ -62,7 +62,7 @@ export function Sidebar({
               value={searchQuery}
               onChange={onSearch}
               onSearch={onSearch}
-              placeholder="Search resources…"
+              placeholder={t("SEARCH_PLACEHOLDER")}
             />
           </div>
         )}

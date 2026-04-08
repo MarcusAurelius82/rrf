@@ -97,7 +97,7 @@ export function ResourcePanel({
           value={searchQuery}
           onChange={onSearchChange}
           onSearch={onSearch}
-          placeholder="Search resources…"
+          placeholder={t("SEARCH_PLACEHOLDER")}
         />
         {/* Documentation filter */}
         <div className="mt-2.5 flex flex-col xs:flex-row gap-1.5" role="group" aria-label="Filter by documentation requirement">

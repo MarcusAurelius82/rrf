@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Resource, ResourceCategory } from "@/types";
 import { CATEGORY_CONFIG, cn } from "@/lib/utils";
+import { useT, type UIKey } from "@/contexts/TranslationContext";
 
 interface Suggestion {
   label: string;
@@ -107,6 +108,12 @@ interface MapSearchInputProps {
   className?: string;
 }
 
+const SUB_KEY: Record<string, UIKey> = {
+  "search nearby": "SUGG_NEARBY",
+  "city":          "SUGG_CITY",
+  "category":      "SUGG_CATEGORY",
+};
+
 export function MapSearchInput({
   resources,
   value,
@@ -115,6 +122,7 @@ export function MapSearchInput({
   placeholder,
   className,
 }: MapSearchInputProps) {
+  const t = useT();
   const [localValue, setLocalValue] = useState(value);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -235,7 +243,7 @@ export function MapSearchInput({
           onKeyDown={handleKeyDown}
           onFocus={() => { if (localValue.length >= 2) setOpen(true); }}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
-          placeholder={placeholder ?? "Search resources…"}
+          placeholder={placeholder ?? t("SEARCH_MAP_PLACEHOLDER")}
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="none"
@@ -282,13 +290,13 @@ export function MapSearchInput({
                   <span className="font-mono text-[12px] text-content-primary truncate block">{s.label}</span>
                   {s.sub && (
                     <span className="font-mono text-[9px] text-content-muted tracking-[0.06em] uppercase">
-                      {s.sub}
+                      {SUB_KEY[s.sub] ? t(SUB_KEY[s.sub]) : s.sub}
                     </span>
                   )}
                 </span>
                 {(s.type === "city" || s.type === "zip") && (
                   <span className="font-mono text-[8px] text-accent tracking-[0.08em] flex-shrink-0">
-                    NEARBY
+                    {t("NEARBY")}
                   </span>
                 )}
               </button>
