@@ -3,7 +3,7 @@ import { DocumentationRequired, Resource } from "@/types";
 import { CATEGORY_CONFIG } from "@/lib/utils";
 import { StatusBadge } from "./StatusBadge";
 import { cn } from "@/lib/utils";
-import { useTranslation } from "@/hooks/useTranslation";
+import { useT, UIKey } from "@/contexts/TranslationContext";
 
 function formatHours(hours: Record<string, string>): string {
   const entries = Object.entries(hours).filter(([, h]) => h && h.trim());
@@ -30,12 +30,20 @@ function formatHours(hours: Record<string, string>): string {
   return entries.length > 2 ? `${shown}  +${entries.length - 2}` : shown;
 }
 
-const DOC_BADGE: Record<DocumentationRequired, { label: string; className: string }> = {
-  none:              { label: "NO DOCS REQUIRED",           className: "text-green-400 bg-green-500/10 border-green-500/20" },
-  id_only:           { label: "ID ONLY",                    className: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
-  legal_status:      { label: "LEGAL STATUS REQUIRED",      className: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20" },
-  benefits_eligible: { label: "PROGRAM ELIGIBILITY REQUIRED", className: "text-orange-400 bg-orange-500/10 border-orange-500/20" },
-  unknown:           { label: "⚠ CALL AHEAD — CONFIRM ELIGIBILITY", className: "text-content-muted bg-border/30 border-border" },
+const DOC_BADGE_STYLE: Record<DocumentationRequired, string> = {
+  none:              "text-green-400 bg-green-500/10 border-green-500/20",
+  id_only:           "text-blue-400 bg-blue-500/10 border-blue-500/20",
+  legal_status:      "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
+  benefits_eligible: "text-orange-400 bg-orange-500/10 border-orange-500/20",
+  unknown:           "text-content-muted bg-border/30 border-border",
+};
+
+const DOC_BADGE_KEY: Record<DocumentationRequired, UIKey> = {
+  none:              "NO_DOCS",
+  id_only:           "ID_ONLY",
+  legal_status:      "LEGAL_STATUS",
+  benefits_eligible: "PROG_ELIGIBLE",
+  unknown:           "CALL_AHEAD",
 };
 
 interface ResourceCardProps {
@@ -43,20 +51,13 @@ interface ResourceCardProps {
   compact?: boolean;
   selected?: boolean;
   onClick?: () => void;
-  lang?: string;
 }
 
-export function ResourceCard({ resource: r, compact, selected, onClick, lang = "EN" }: ResourceCardProps) {
+export function ResourceCard({ resource: r, compact, selected, onClick }: ResourceCardProps) {
+  const t = useT();
   const cat = CATEGORY_CONFIG[r.category];
   const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(`${r.address} ${r.city} ${r.state}`)}`;
-
-  // Translate the content a user needs to navigate to and use the resource
-  const sourceTexts = [
-    r.name,
-    compact ? `${r.city}, ${r.state}` : `${r.address}, ${r.city}, ${r.state}`,
-    r.documentation_required ? (DOC_BADGE[r.documentation_required]?.label ?? "") : "",
-  ];
-  const [tName, tAddress, tDocLabel] = useTranslation(sourceTexts, lang);
+  const address = compact ? `${r.city}, ${r.state}` : `${r.address}, ${r.city}, ${r.state}`;
 
   return (
     <article
@@ -79,13 +80,13 @@ export function ResourceCard({ resource: r, compact, selected, onClick, lang = "
             className="font-mono text-[9px] md:text-[8px] font-semibold text-content-muted tracking-[0.12em] mb-0.5"
             aria-hidden="true"
           >
-            {cat.label}
+            {t(cat.label.toUpperCase() as UIKey)}
           </div>
           <h3 className={cn(
             "font-sans text-[14px] font-semibold text-content-primary leading-tight",
             compact ? "truncate" : "line-clamp-2"
           )}>
-            {tName}
+            {r.name}
           </h3>
         </div>
         <div
@@ -102,15 +103,15 @@ export function ResourceCard({ resource: r, compact, selected, onClick, lang = "
         <StatusBadge status={r.status} />
         {r.urgent && (
           <span className="inline-block font-mono text-[9px] md:text-[8px] font-bold tracking-[0.1em] px-2 py-0.5 rounded text-red-400 bg-red-500/10 border border-red-500/20">
-            URGENT
+            {t("URGENT")}
           </span>
         )}
-        {r.documentation_required && DOC_BADGE[r.documentation_required] && (
+        {r.documentation_required && DOC_BADGE_STYLE[r.documentation_required] && (
           <span className={cn(
             "inline-block font-mono text-[9px] md:text-[8px] font-bold tracking-[0.1em] px-2 py-0.5 rounded border",
-            DOC_BADGE[r.documentation_required].className
+            DOC_BADGE_STYLE[r.documentation_required]
           )}>
-            {tDocLabel || DOC_BADGE[r.documentation_required].label}
+            {r.documentation_required === "unknown" ? "⚠ " : ""}{t(DOC_BADGE_KEY[r.documentation_required])}
           </span>
         )}
       </div>
@@ -120,7 +121,7 @@ export function ResourceCard({ resource: r, compact, selected, onClick, lang = "
         <div className="flex items-start gap-2 font-mono text-[11px] md:text-[10px] text-content-secondary">
           <dt className="text-content-muted mt-px flex-shrink-0" aria-hidden="true">⊙</dt>
           <dd className="leading-tight">
-            <address className="not-italic">{tAddress}</address>
+            <address className="not-italic">{address}</address>
           </dd>
         </div>
         {r.phone && (
@@ -162,7 +163,7 @@ export function ResourceCard({ resource: r, compact, selected, onClick, lang = "
         className="block w-full py-3 md:py-2 rounded-md bg-accent hover:bg-accent-hover font-mono text-[10px] font-bold tracking-[0.1em] text-white text-center transition-all"
         aria-label={`Get directions to ${r.name}`}
       >
-        GET DIRECTIONS
+        {t("GET_DIRECTIONS")}
       </a>
     </article>
   );

@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { CATEGORY_CONFIG } from "@/lib/utils";
 import { ResourceCategory } from "@/types";
 import { SearchInput } from "./SearchInput";
+import { useT, UIKey } from "@/contexts/TranslationContext";
 
 interface SidebarProps {
   activeCategory: ResourceCategory | null;
@@ -24,6 +25,7 @@ export function Sidebar({
   searchQuery = "",
   onSearch,
 }: SidebarProps) {
+  const t = useT();
   const touchStartX = useRef<number | null>(null);
 
   return (
@@ -41,7 +43,7 @@ export function Sidebar({
       {/* Mobile header */}
       {onClose && (
         <div className="flex items-center justify-between px-3.5 pb-3 mb-1 border-b border-border-subtle md:hidden">
-          <span className="font-mono text-[11px] font-semibold text-content-secondary tracking-[0.08em]">FILTERS</span>
+          <span className="font-mono text-[11px] font-semibold text-content-secondary tracking-[0.08em]">{t("FILTERS")}</span>
           <button
             onClick={onClose}
             aria-label="Close filters"
@@ -101,7 +103,7 @@ export function Sidebar({
                   className="font-mono text-[11px] md:text-[10px] font-semibold tracking-[0.08em] flex-1 text-left"
                   style={{ color: isActive ? color : "var(--text-secondary)" }}
                 >
-                  {label}
+                  {t(cat.label.toUpperCase() as UIKey)}
                 </span>
                 <span
                   className="font-mono text-[9px] text-content-tertiary bg-surface-1 px-1.5 py-0.5 rounded-full border border-border-subtle"
@@ -123,7 +125,7 @@ export function Sidebar({
           className="w-full text-left font-mono text-[10px] font-medium text-content-tertiary px-2.5 py-2 rounded-md border border-border hover:border-border-active hover:text-content-primary hover:bg-surface-2 transition-all"
           aria-label="Report a missing resource"
         >
-          + Report Missing Resource
+          {t("REPORT_MISSING")}
         </button>
       </div>
 
@@ -133,13 +135,13 @@ export function Sidebar({
             href="mailto:support@refugee-node.org"
             className="flex w-full text-left font-mono text-[10px] text-content-muted px-1 py-1.5 hover:text-content-secondary transition-colors tracking-[0.06em]"
           >
-            ⊙  SUPPORT
+            ⊙  {t("SUPPORT")}
           </a>
           <a
             href="/faq"
             className="flex w-full text-left font-mono text-[10px] text-content-muted px-1 py-1.5 hover:text-content-secondary transition-colors tracking-[0.06em]"
           >
-            ?  FAQ
+            ?  {t("FAQ")}
           </a>
         </nav>
       </div>

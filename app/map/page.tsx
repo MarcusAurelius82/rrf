@@ -10,6 +10,7 @@ import { ReportModal } from "@/components/ui/ReportModal";
 import { Resource, ResourceCategory } from "@/types";
 import { CATEGORY_CONFIG } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { TranslationProvider } from "@/contexts/TranslationContext";
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
@@ -153,6 +154,7 @@ export default function MapPage() {
   );
 
   return (
+    <TranslationProvider lang={currentLang}>
     <div className="flex flex-col h-screen overflow-hidden">
       <Navbar currentLang={currentLang} onLanguageChange={setCurrentLang} />
 
@@ -220,7 +222,6 @@ export default function MapPage() {
             onSearchChange={handleSearch}
             selectedResourceId={selectedResourceId}
             onSelectResource={handleSelectResource}
-            lang={currentLang}
           />
         </div>
       </div>
@@ -234,7 +235,6 @@ export default function MapPage() {
         isLoading={isLoading}
         selectedResourceId={selectedResourceId}
         onSelectResource={handleSelectResource}
-        lang={currentLang}
       />
 
       {/* Report Missing Resource modal */}
@@ -245,5 +245,6 @@ export default function MapPage() {
         />
       )}
     </div>
+    </TranslationProvider>
   );
 }
