@@ -33,7 +33,8 @@ export async function GET(request: NextRequest) {
     const baseQuery = (cat?: string) => {
       let q = supabase.from("resources").select("*")
         .eq("verified", true)
-        .order("urgent", { ascending: false })
+        .order("urgent",   { ascending: false })
+        .order("priority", { ascending: false })
         .order("name");
 
       if (hasBbox) {
