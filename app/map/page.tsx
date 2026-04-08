@@ -21,9 +21,12 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+type MapBounds = { north: number; south: number; east: number; west: number };
+
 export default function MapPage() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [filteredResources, setFilteredResources] = useState<Resource[]>([]);
+  const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
   const [selectedState, setSelectedState] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<ResourceCategory | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -31,6 +34,14 @@ export default function MapPage() {
   const [currentLang, setCurrentLang] = useState("EN");
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
   const [flyToCoords, setFlyToCoords] = useState<[number, number] | null>(null);
+
+  // Resources visible in the current map viewport — drives the list panels
+  const visibleResources = mapBounds
+    ? filteredResources.filter(r =>
+        r.lat >= mapBounds.south && r.lat <= mapBounds.north &&
+        r.lng >= mapBounds.west  && r.lng <= mapBounds.east
+      )
+    : filteredResources;
 
   // Mobile drawer state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -147,6 +158,7 @@ export default function MapPage() {
           selectedResourceId={selectedResourceId}
           onSelectResource={handleSelectResource}
           flyToCoords={flyToCoords}
+          onBoundsChange={setMapBounds}
         />
 
         {/* Mobile search bar — floats over map, leaves room for hamburger button */}
@@ -163,7 +175,8 @@ export default function MapPage() {
         {/* Resource panel — large screens only (1024px+) */}
         <div className="hidden lg:block relative">
           <ResourcePanel
-            resources={filteredResources}
+            resources={visibleResources}
+            totalCount={filteredResources.length}
             selectedState={selectedState}
             isLoading={isLoading}
             onSearch={handleSearch}
@@ -177,7 +190,8 @@ export default function MapPage() {
 
       {/* Mobile bottom sheet — category pills + horizontal card scroll */}
       <MobileBottomSheet
-        resources={filteredResources}
+        resources={visibleResources}
+        totalCount={filteredResources.length}
         activeCategory={activeCategory}
         onCategoryChange={setActiveCategory}
         isLoading={isLoading}

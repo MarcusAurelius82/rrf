@@ -15,6 +15,7 @@ const DOC_FILTER_LABELS: Record<DocFilter, string> = {
 
 interface ResourcePanelProps {
   resources: Resource[];
+  totalCount?: number;
   selectedState: string | null;
   isLoading?: boolean;
   aiSummary?: string;
@@ -28,6 +29,7 @@ interface ResourcePanelProps {
 
 export function ResourcePanel({
   resources,
+  totalCount = 0,
   selectedState,
   isLoading,
   aiSummary,
@@ -150,6 +152,16 @@ export function ResourcePanel({
               />
             </div>
           ))
+        ) : totalCount > 0 ? (
+          <div className="flex flex-col items-center justify-center flex-1 gap-3 text-content-muted px-4">
+            <div className="text-3xl mb-1" aria-hidden="true">⊕</div>
+            <div className="font-mono text-[11px] tracking-[0.08em] text-center">
+              ZOOM OUT TO SEE {totalCount} RESULT{totalCount !== 1 ? "S" : ""}
+            </div>
+            <div className="font-mono text-[9px] text-content-tertiary tracking-[0.06em] text-center">
+              {totalCount} resource{totalCount !== 1 ? "s" : ""} outside current view
+            </div>
+          </div>
         ) : (
           <div className="flex flex-col items-center justify-center flex-1 gap-3 text-content-muted px-4">
             <div className="text-3xl mb-1" aria-hidden="true">◎</div>

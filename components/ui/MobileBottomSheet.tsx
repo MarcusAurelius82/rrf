@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 interface MobileBottomSheetProps {
   resources: Resource[];
+  totalCount?: number;
   activeCategory: ResourceCategory | null;
   onCategoryChange: (cat: ResourceCategory | null) => void;
   isLoading?: boolean;
@@ -16,6 +17,7 @@ interface MobileBottomSheetProps {
 
 export function MobileBottomSheet({
   resources,
+  totalCount = 0,
   activeCategory,
   onCategoryChange,
   isLoading,
@@ -85,7 +87,9 @@ export function MobileBottomSheet({
             </div>
           ) : resources.length === 0 ? (
             <div className="font-mono text-[11px] text-content-muted py-3 px-1 tracking-[0.08em]">
-              NO RESOURCES — SELECT A STATE ON THE MAP
+              {totalCount > 0
+                ? `ZOOM OUT TO SEE ${totalCount} RESULT${totalCount !== 1 ? "S" : ""}`
+                : "NO RESOURCES — SELECT A STATE ON THE MAP"}
             </div>
           ) : (
             resources.slice(0, 20).map((r) => (
