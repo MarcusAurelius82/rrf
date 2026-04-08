@@ -12,8 +12,6 @@ interface MobileBottomSheetProps {
   isLoading?: boolean;
   selectedResourceId?: string | null;
   onSelectResource?: (id: string) => void;
-  collapsed?: boolean;
-  onCollapse?: () => void;
 }
 
 export function MobileBottomSheet({
@@ -23,11 +21,8 @@ export function MobileBottomSheet({
   isLoading,
   selectedResourceId,
   onSelectResource,
-  collapsed = false,
-  onCollapse,
 }: MobileBottomSheetProps) {
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const touchStartY = useRef<number | null>(null);
 
   // Scroll selected card into view when selection changes (e.g. from map pin tap)
   useEffect(() => {
@@ -45,23 +40,9 @@ export function MobileBottomSheet({
       />
 
       {/* Sheet content */}
-      <div
-        className="bg-surface-0 border-t border-border pointer-events-auto shadow-2xl"
-        onTouchStart={e => { touchStartY.current = e.touches[0].clientY; }}
-        onTouchEnd={e => {
-          if (touchStartY.current === null) return;
-          const delta = e.changedTouches[0].clientY - touchStartY.current;
-          touchStartY.current = null;
-          if (delta > 48) onCollapse?.(); // swipe down ≥ 48px → collapse
-        }}
-      >
-        {/* Drag handle */}
-        <div className="flex justify-center pt-2 pb-1">
-          <div className="w-8 h-1 rounded-full bg-border-active" aria-hidden="true" />
-        </div>
-
+      <div className="bg-surface-0 border-t border-border pointer-events-auto shadow-2xl">
         {/* Category pills */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar px-3 pt-1 pb-2">
+        <div className="flex gap-2 overflow-x-auto no-scrollbar px-3 pt-2 pb-2">
           <button
             onClick={() => onCategoryChange(null)}
             className={cn(
@@ -96,11 +77,8 @@ export function MobileBottomSheet({
           )}
         </div>
 
-        {/* Horizontal cards row — slides away when map is tapped */}
-        <div className={cn(
-          "flex gap-3 overflow-x-auto no-scrollbar px-3 transition-all duration-300 ease-in-out",
-          collapsed ? "max-h-0 pb-0 opacity-0 overflow-hidden" : "max-h-[200px] pb-4 opacity-100"
-        )}>
+        {/* Horizontal cards row */}
+        <div className="flex gap-3 overflow-x-auto no-scrollbar px-3 pb-4">
           {isLoading ? (
             <div className="font-mono text-[11px] text-content-muted animate-pulse py-3 px-1 tracking-[0.1em]">
               LOADING...
@@ -113,7 +91,7 @@ export function MobileBottomSheet({
             resources.slice(0, 20).map((r) => (
               <div
                 key={r.id}
-                className="flex-shrink-0 w-[260px]"
+                className="flex-shrink-0 w-[260px] [&_article]:!p-2 [&_a.block]:!py-1"
                 ref={el => { if (el) cardRefs.current.set(r.id, el); else cardRefs.current.delete(r.id); }}
               >
                 <ResourceCard

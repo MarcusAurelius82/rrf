@@ -30,7 +30,6 @@ export default function MapPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [currentLang, setCurrentLang] = useState("EN");
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
-  const [bottomSheetCollapsed, setBottomSheetCollapsed] = useState(false);
   const [flyToCoords, setFlyToCoords] = useState<[number, number] | null>(null);
 
   // Mobile drawer state
@@ -98,10 +97,8 @@ export default function MapPage() {
     setSelectedState(state);
   }, []);
 
-  // Selecting a resource (pin tap) expands the bottom sheet
   const handleSelectResource = useCallback((id: string | null) => {
     setSelectedResourceId(id);
-    if (id) setBottomSheetCollapsed(false);
   }, []);
 
   const categoryCounts = Object.fromEntries(
@@ -149,7 +146,6 @@ export default function MapPage() {
           onMobileSidebarToggle={() => setMobileSidebarOpen(o => !o)}
           selectedResourceId={selectedResourceId}
           onSelectResource={handleSelectResource}
-          onMapTap={() => setBottomSheetCollapsed(true)}
           flyToCoords={flyToCoords}
         />
 
@@ -183,12 +179,10 @@ export default function MapPage() {
       <MobileBottomSheet
         resources={filteredResources}
         activeCategory={activeCategory}
-        onCategoryChange={cat => { setActiveCategory(cat); setBottomSheetCollapsed(false); }}
+        onCategoryChange={setActiveCategory}
         isLoading={isLoading}
         selectedResourceId={selectedResourceId}
         onSelectResource={handleSelectResource}
-        collapsed={bottomSheetCollapsed}
-        onCollapse={() => setBottomSheetCollapsed(true)}
       />
 
       {/* Report Missing Resource modal */}
