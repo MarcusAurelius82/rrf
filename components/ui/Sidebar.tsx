@@ -103,7 +103,7 @@ export function Sidebar({
                   className="font-mono text-[11px] md:text-[10px] font-semibold tracking-[0.08em] flex-1 text-left"
                   style={{ color: isActive ? color : "var(--text-secondary)" }}
                 >
-                  {t(cat.label.toUpperCase() as UIKey)}
+                  {t(label.toUpperCase() as UIKey)}
                 </span>
                 <span
                   className="font-mono text-[9px] text-content-tertiary bg-surface-1 px-1.5 py-0.5 rounded-full border border-border-subtle"
