@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Navbar } from "@/components/ui/Navbar";
 import { Sidebar } from "@/components/ui/Sidebar";
 import { MapView } from "@/components/map/MapView";
@@ -35,19 +35,27 @@ export default function MapPage() {
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
   const [flyToCoords, setFlyToCoords] = useState<[number, number] | null>(null);
 
-  // Resources visible in the current map viewport — drives the list panels
+  // Mobile drawer state
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  // Report modal
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+
+  // Refs for debounced viewport fetch
+  const boundsDebounceRef  = useRef<NodeJS.Timeout>();
+  const fetchControllerRef = useRef<AbortController | null>(null);
+  const mapBoundsRef       = useRef<MapBounds | null>(null);
+  const activeCategoryRef  = useRef(activeCategory);
+  activeCategoryRef.current = activeCategory;
+
+  // Resources visible in the current map viewport — drives the list panels.
+  // Since the API already filters by bbox, this is mostly a no-op safety check.
   const visibleResources = mapBounds
     ? filteredResources.filter(r =>
         r.lat >= mapBounds.south && r.lat <= mapBounds.north &&
         r.lng >= mapBounds.west  && r.lng <= mapBounds.east
       )
     : filteredResources;
-
-  // Mobile drawer state
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-
-  // Report modal
-  const [reportModalOpen, setReportModalOpen] = useState(false);
 
   // Prevent body scroll when a drawer is open on mobile
   useEffect(() => {
@@ -56,24 +64,52 @@ export default function MapPage() {
     return () => document.body.classList.remove("drawer-open");
   }, [mobileSidebarOpen, reportModalOpen]);
 
-  // Fetch resources nationwide — state selection only flies the map
-  useEffect(() => {
+  // ── Viewport fetch ────────────────────────────────────────────────────────
+  // Fetches resources for the current bbox + category. Cancels in-flight
+  // requests when a new one arrives so stale data never overwrites fresh data.
+  function fetchViewport(bounds: MapBounds, category: ResourceCategory | null) {
+    fetchControllerRef.current?.abort();
+    fetchControllerRef.current = new AbortController();
+
     setIsLoading(true);
     const params = new URLSearchParams();
-    if (activeCategory) params.set("category", activeCategory);
+    if (category) params.set("category", category);
+    params.set("min_lat", bounds.south.toFixed(6));
+    params.set("max_lat", bounds.north.toFixed(6));
+    params.set("min_lng", bounds.west.toFixed(6));
+    params.set("max_lng", bounds.east.toFixed(6));
 
-    fetch(`/api/resources?${params}`)
+    fetch(`/api/resources?${params}`, { signal: fetchControllerRef.current.signal })
       .then(r => r.json())
       .then(({ data }) => {
         setResources(data || []);
         setFilteredResources(data || []);
-        setSearchQuery(""); // clear search when base data changes
+        setSearchQuery("");
       })
-      .catch(console.error)
+      .catch(err => { if (err.name !== "AbortError") console.error(err); })
       .finally(() => setIsLoading(false));
+  }
+
+  // Bounds change from MapView — debounce 400ms so we don't fire on every
+  // pixel of a pan, then fetch full fidelity data for the new viewport.
+  const handleBoundsChange = useCallback((bounds: MapBounds) => {
+    setMapBounds(bounds);
+    mapBoundsRef.current = bounds;
+    clearTimeout(boundsDebounceRef.current);
+    boundsDebounceRef.current = setTimeout(() => {
+      fetchViewport(bounds, activeCategoryRef.current);
+    }, 400);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-fetch when category changes, using the last known bounds
+  useEffect(() => {
+    if (!mapBoundsRef.current) return;
+    fetchViewport(mapBoundsRef.current, activeCategory);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCategory]);
 
-  // Full-text search via Postgres
+  // ── Search ────────────────────────────────────────────────────────────────
   async function handleSearch(query: string) {
     setSearchQuery(query);
     if (!query.trim()) {
@@ -93,7 +129,7 @@ export default function MapPage() {
     finally { setIsLoading(false); }
   }
 
-  // Location search (city/zip) — sort resources by proximity, fly map there
+  // Location search (city/zip) — sort by proximity and fly map there
   function handleLocationSearch(coords: [number, number], label: string) {
     const [lng, lat] = coords;
     setFlyToCoords(coords);
@@ -158,7 +194,7 @@ export default function MapPage() {
           selectedResourceId={selectedResourceId}
           onSelectResource={handleSelectResource}
           flyToCoords={flyToCoords}
-          onBoundsChange={setMapBounds}
+          onBoundsChange={handleBoundsChange}
         />
 
         {/* Mobile search bar — floats over map, leaves room for hamburger button */}

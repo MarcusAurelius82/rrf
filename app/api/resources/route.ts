@@ -5,41 +5,63 @@ import { ApiResponse, Resource } from "@/types";
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const state = searchParams.get("state");
-    const category = searchParams.get("category");
+    const state      = searchParams.get("state");
+    const category   = searchParams.get("category");
     const urgentOnly = searchParams.get("urgent_only") === "true";
+
+    // Viewport bbox — when present, return full fidelity for that area
+    const minLat = searchParams.get("min_lat");
+    const maxLat = searchParams.get("max_lat");
+    const minLng = searchParams.get("min_lng");
+    const maxLng = searchParams.get("max_lng");
+    const hasBbox = minLat && maxLat && minLng && maxLng;
 
     const supabase = createAdminClient();
 
-    const baseQuery = () =>
-      supabase.from("resources").select("*")
+    const baseQuery = () => {
+      let q = supabase.from("resources").select("*")
         .eq("verified", true)
-        .gte("lat", 24).lte("lat", 49)
-        .gte("lng", -125).lte("lng", -66)
         .order("urgent", { ascending: false })
         .order("name");
+
+      if (hasBbox) {
+        // Tight viewport bounds — return everything within the box
+        q = q
+          .gte("lat", parseFloat(minLat!))
+          .lte("lat", parseFloat(maxLat!))
+          .gte("lng", parseFloat(minLng!))
+          .lte("lng", parseFloat(maxLng!));
+      } else {
+        // Fallback / national view — clamp to US
+        q = q.gte("lat", 24).lte("lat", 49).gte("lng", -125).lte("lng", -66);
+      }
+
+      return q;
+    };
 
     let data: Resource[];
 
     if (category) {
-      // Single-category request — return all matching records
       let q = baseQuery().eq("category", category);
       if (state) q = q.eq("state", state);
       if (urgentOnly) q = q.eq("urgent", true);
+      // No cap when bbox is set; 500 safety limit for unbounded category queries
+      if (!hasBbox) q = q.limit(500);
       const { data: rows, error } = await q;
       if (error) throw error;
       data = rows ?? [];
     } else {
-      // No category filter — cap each category to balance the map.
-      // Higher cap for national view (no state) so clusters are meaningful.
       const CATEGORIES = ["medical", "shelter", "food", "legal", "language"] as const;
-      const CAP = state ? 20 : 50;
+      // No cap for viewport queries — return everything in the box.
+      // Fallback national view keeps a per-category cap so the initial load is fast.
+      const CAP = hasBbox ? null : (state ? 20 : 50);
 
       const results = await Promise.all(
         CATEGORIES.map(cat => {
-          let q = baseQuery().eq("category", cat).limit(CAP);
+          let q = baseQuery().eq("category", cat);
           if (state) q = q.eq("state", state);
           if (urgentOnly) q = q.eq("urgent", true);
+          if (CAP !== null) q = q.limit(CAP);
           return q;
         })
       );
