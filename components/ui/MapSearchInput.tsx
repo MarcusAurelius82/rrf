@@ -31,10 +31,12 @@ function getSuggestions(query: string, resources: Resource[]): Suggestion[] {
   }
 
   // Category keywords
+  let hasCategoryMatch = false;
   (Object.entries(CATEGORY_CONFIG) as [ResourceCategory, (typeof CATEGORY_CONFIG)[ResourceCategory]][])
     .forEach(([, cat]) => {
       if (cat.label.toLowerCase().includes(q) && !seen.has(cat.label)) {
         seen.add(cat.label);
+        hasCategoryMatch = true;
         suggestions.push({ label: cat.label, sub: "category", value: cat.label, icon: cat.icon, type: "category" });
       }
     });
@@ -56,6 +58,12 @@ function getSuggestions(query: string, resources: Resource[]): Suggestion[] {
     }
   });
 
+  // If nothing location-related matched in the DB, add a synthetic "search nearby" suggestion
+  // so the user can still geocode any city name even with no local resources
+  if (cityMap.size === 0 && !hasCategoryMatch && q.length >= 3) {
+    suggestions.unshift({ label: query.trim(), sub: "search nearby", value: query.trim(), icon: "⊙", type: "city" });
+  }
+
   // Resource names
   resources
     .filter(r => r.name.toLowerCase().includes(q))
@@ -76,16 +84,16 @@ function getSuggestions(query: string, resources: Resource[]): Suggestion[] {
   return suggestions.slice(0, 6);
 }
 
-async function geocodeLocation(query: string): Promise<[number, number] | null> {
+async function geocodeLocation(query: string): Promise<{ coords: [number, number]; relevance: number } | null> {
   try {
     const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
     const url =
       `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json` +
-      `?country=US&access_token=${token}`;
-    const res = await fetch(url);
-    const json = await res.json() as { features?: Array<{ center?: [number, number] }> };
-    const center = json.features?.[0]?.center;
-    if (center && center.length === 2) return center;
+      `?types=place,postcode&country=US&access_token=${token}`;
+    const res  = await fetch(url);
+    const json = await res.json() as { features?: Array<{ center?: [number, number]; relevance?: number }> };
+    const f    = json.features?.[0];
+    if (f?.center && f.center.length === 2) return { coords: f.center, relevance: f.relevance ?? 0 };
   } catch { /* ignore */ }
   return null;
 }
@@ -140,12 +148,12 @@ export function MapSearchInput({
 
     // Zip code
     if (/^\d{5}$/.test(q) && onLocationSearch) {
-      const coords = await geocodeLocation(q);
-      if (coords) { onLocationSearch(coords, q); return; }
+      const result = await geocodeLocation(q);
+      if (result) { onLocationSearch(result.coords, q); return; }
     }
 
-    // City name or "City STATE" / "City, STATE" — match against loaded resources
     if (onLocationSearch) {
+      // City name or "City STATE" / "City, STATE" — match against loaded resources first
       const normalized = q.toLowerCase().replace(/,\s*/g, " ").trim();
       const match = resources.find(r => {
         const c  = r.city.toLowerCase();
@@ -153,9 +161,18 @@ export function MapSearchInput({
         return c === normalized || cs === normalized;
       });
       if (match) {
-        const label = `${match.city}, ${match.state}`;
-        const coords = await geocodeLocation(label);
-        if (coords) { onLocationSearch(coords, label); return; }
+        const label  = `${match.city}, ${match.state}`;
+        const result = await geocodeLocation(label);
+        if (result) { onLocationSearch(result.coords, label); return; }
+      }
+
+      // No resource match — try geocoding the raw query directly.
+      // Only accept high-confidence results (≥ 0.5) so service keywords
+      // like "shelter" don't accidentally fly to Shelter, MT.
+      const fallback = await geocodeLocation(q);
+      if (fallback && fallback.relevance >= 0.5) {
+        onLocationSearch(fallback.coords, q);
+        return;
       }
     }
 
@@ -171,9 +188,9 @@ export function MapSearchInput({
 
     // City or zip → geocode and show nearest resources
     if ((s.type === "city" || s.type === "zip") && onLocationSearch) {
-      const coords = await geocodeLocation(s.value);
-      if (coords) {
-        onLocationSearch(coords, s.label);
+      const result = await geocodeLocation(s.value);
+      if (result) {
+        onLocationSearch(result.coords, s.label);
         return;
       }
     }
@@ -186,6 +203,8 @@ export function MapSearchInput({
       e.preventDefault();
       if (activeIdx >= 0 && suggestions[activeIdx]) {
         commitSuggestion(suggestions[activeIdx]);
+      } else if (suggestions.length > 0) {
+        commitSuggestion(suggestions[0]);
       } else {
         commitText(localValue);
       }
