@@ -39,9 +39,13 @@ function getSuggestions(query: string, resources: Resource[]): Suggestion[] {
       }
     });
 
-  // Cities
+  // Cities — match plain city name OR "city state" / "city, state" patterns
   const cityMap = new Map<string, Resource>();
-  resources.filter(r => r.city.toLowerCase().includes(q)).forEach(r => {
+  resources.filter(r => {
+    const c  = r.city.toLowerCase();
+    const cs = `${r.city} ${r.state}`.toLowerCase();
+    return c.includes(q) || cs.startsWith(q);
+  }).forEach(r => {
     const key = `${r.city}, ${r.state}`;
     if (!cityMap.has(key)) cityMap.set(key, r);
   });
@@ -125,12 +129,38 @@ export function MapSearchInput({
     }, 180);
   }
 
-  function commitText(val: string) {
+  async function commitText(val: string) {
     setLocalValue(val);
     setSuggestions([]);
     setOpen(false);
-    onSearch(val);
     inputRef.current?.blur();
+
+    const q = val.trim();
+    if (!q) { onSearch(""); return; }
+
+    // Zip code
+    if (/^\d{5}$/.test(q) && onLocationSearch) {
+      const coords = await geocodeLocation(q);
+      if (coords) { onLocationSearch(coords, q); return; }
+    }
+
+    // City name or "City STATE" / "City, STATE" — match against loaded resources
+    if (onLocationSearch) {
+      const normalized = q.toLowerCase().replace(/,\s*/g, " ").trim();
+      const match = resources.find(r => {
+        const c  = r.city.toLowerCase();
+        const cs = `${r.city} ${r.state}`.toLowerCase();
+        return c === normalized || cs === normalized;
+      });
+      if (match) {
+        const label = `${match.city}, ${match.state}`;
+        const coords = await geocodeLocation(label);
+        if (coords) { onLocationSearch(coords, label); return; }
+      }
+    }
+
+    // Fall back to full-text resource search
+    onSearch(val);
   }
 
   async function commitSuggestion(s: Suggestion) {
