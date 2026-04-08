@@ -1,64 +1,59 @@
 "use client";
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
+import { UI_STRINGS, UIKey } from "@/lib/ui-strings";
+import staticTranslationsJson from "@/lib/ui-translations.json";
 
-// All static UI strings that need translation.
-// Proper nouns (org names, addresses) are intentionally excluded.
-export const UI_STRINGS = {
-  // Categories
-  ALL:              "ALL",
-  SHELTER:          "SHELTER",
-  FOOD:             "FOOD",
-  LEGAL:            "LEGAL",
-  MEDICAL:          "MEDICAL",
-  LANGUAGE:         "LANGUAGE",
-  // Status badges
-  OPEN:             "OPEN",
-  CLOSED:           "CLOSED",
-  CLOSING_SOON:     "CLOSING SOON",
-  APPT_ONLY:        "APPOINTMENT ONLY",
-  // Urgency
-  URGENT:           "URGENT",
-  // Actions
-  GET_DIRECTIONS:   "GET DIRECTIONS",
-  REPORT_MISSING:   "+ Report Missing Resource",
-  // Documentation badges
-  NO_DOCS:          "NO DOCS REQUIRED",
-  ID_ONLY:          "ID ONLY",
-  LEGAL_STATUS:     "LEGAL STATUS REQUIRED",
-  PROG_ELIGIBLE:    "PROGRAM ELIGIBILITY REQUIRED",
-  CALL_AHEAD:       "CALL AHEAD — CONFIRM ELIGIBILITY",
-  // Loading / empty states
-  LOADING:          "LOADING...",
-  NO_RESOURCES:     "NO RESOURCES FOUND",
-  ZOOM_OUT:         "ZOOM OUT TO SEE",
-  RESULT_S:         "RESULTS",
-  RESULT_1:         "RESULT",
-  SELECT_STATE:     "NO RESOURCES — SELECT A STATE ON THE MAP",
-  OUTSIDE_VIEW:     "resources outside current view",
-  // Panel labels
-  LOCAL_RESOURCES:  "LOCAL RESOURCES",
-  CRISIS_SUPPORT:   "CRISIS SUPPORT",
-  EMERGENCY_SVCS:   "EMERGENCY SERVICES",
-  REFUGEE_HOTLINE:  "REFUGEE HOTLINE",
-  // Doc filter buttons
-  ALL_RESOURCES:    "ALL RESOURCES",
-  // Sidebar
-  FILTERS:          "FILTERS",
-  SUPPORT:          "SUPPORT",
-  FAQ:              "FAQ",
-} as const;
+export { UI_STRINGS, type UIKey };
 
-export type UIKey = keyof typeof UI_STRINGS;
-
-// Module-level cache: lang code → translated map (persists across re-renders)
-const langCache = new Map<string, Map<UIKey, string>>();
-
+type TranslationMap = Map<UIKey, string>;
 type TFunc = (key: UIKey) => string;
+
+// Cast static JSON: { [langCode]: { [UIKey]: string } }
+const staticData = staticTranslationsJson as Record<string, Record<string, string>>;
+
+// Convert a language's static data to a Map once and cache it
+const staticMaps = new Map<string, TranslationMap>();
+
+function getStaticMap(lang: string): TranslationMap | null {
+  if (staticMaps.has(lang)) return staticMaps.get(lang)!;
+  const raw = staticData[lang];
+  if (!raw) return null;
+  const map = new Map<UIKey, string>(Object.entries(raw) as [UIKey, string][]);
+  staticMaps.set(lang, map);
+  return map;
+}
+
+// Runtime cache for languages not in the static file (fallback fetch)
+const runtimeCache = new Map<string, TranslationMap>();
+
+async function fetchTranslations(lang: string): Promise<TranslationMap> {
+  if (runtimeCache.has(lang)) return runtimeCache.get(lang)!;
+
+  const keys = Object.keys(UI_STRINGS) as UIKey[];
+  const texts = keys.map((k) => UI_STRINGS[k]);
+
+  try {
+    const res = await fetch("/api/translate/batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ texts, target_lang: lang }),
+    });
+    const { data } = await res.json() as { data: { translations: string[] } };
+    const map = new Map<UIKey, string>();
+    keys.forEach((k, i) => map.set(k, data.translations[i] ?? UI_STRINGS[k]));
+    runtimeCache.set(lang, map);
+    return map;
+  } catch {
+    return new Map(); // caller falls back to English
+  }
+}
 
 const TranslationContext = createContext<TFunc>((key) => UI_STRINGS[key]);
 
 export function TranslationProvider({ lang, children }: { lang: string; children: ReactNode }) {
-  const [translations, setTranslations] = useState<Map<UIKey, string> | null>(null);
+  const [translations, setTranslations] = useState<TranslationMap | null>(() =>
+    lang !== "EN" ? getStaticMap(lang) : null
+  );
   const currentLang = useRef(lang);
 
   useEffect(() => {
@@ -69,35 +64,18 @@ export function TranslationProvider({ lang, children }: { lang: string; children
       return;
     }
 
-    // Return cached result immediately if available
-    if (langCache.has(lang)) {
-      setTranslations(langCache.get(lang)!);
+    // Static file: instant, no API call
+    const staticMap = getStaticMap(lang);
+    if (staticMap) {
+      setTranslations(staticMap);
       return;
     }
 
-    // Batch-translate all UI strings in one request
-    const keys = Object.keys(UI_STRINGS) as UIKey[];
-    const texts = keys.map((k) => UI_STRINGS[k]);
-
-    fetch("/api/translate/batch", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ texts, target_lang: lang }),
-    })
-      .then((r) => r.json())
-      .then(({ data }: { data: { translations: string[] } }) => {
-        if (currentLang.current !== lang) return; // stale response — discard
-        const map = new Map<UIKey, string>();
-        keys.forEach((k, i) => {
-          map.set(k, data.translations[i] ?? UI_STRINGS[k]);
-        });
-        langCache.set(lang, map);
-        setTranslations(map);
-      })
-      .catch(() => {
-        // Graceful fallback to English
-        setTranslations(null);
-      });
+    // Fallback: runtime fetch for any language not yet in the static file
+    fetchTranslations(lang).then((map) => {
+      if (currentLang.current !== lang) return; // stale
+      setTranslations(map.size ? map : null);
+    });
   }, [lang]);
 
   const t: TFunc = (key) =>

@@ -14,7 +14,8 @@
     "seed:orgs": "tsx scripts/seed-organizations.ts",
     "seed:irc": "tsx scripts/seed-irc.ts",
     "seed:hic": "tsx scripts/seed-hud-hic.ts",
-    "seed:snap": "tsx scripts/seed-snap.ts"
+    "seed:snap": "tsx scripts/seed-snap.ts",
+    "generate:translations": "tsx scripts/generate-ui-translations.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.0",
