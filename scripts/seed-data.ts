@@ -40,6 +40,7 @@ interface ResourceRow {
   website?: string;
   urgent:   boolean;
   verified: boolean;
+  priority: number;
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -292,6 +293,18 @@ async function seedHRSA(existing: Set<string>) {
   const { headers, rows } = parseCsv(csvText);
   console.log(`  Parsed ${rows.length} rows from CSV`);
 
+  // Score HRSA records by refugee-relevance (1–10).
+  // Signals checked in order — first match wins.
+  function hrsaPriority(name: string, typeDesc: string): number {
+    const text = `${name} ${typeDesc}`.toLowerCase();
+    if (/refugee|resettlement|immigrant/i.test(text))     return 10;
+    if (/migrant|farmworker|seasonal worker/i.test(text)) return 9;
+    if (/homeless|shelter|unhoused/i.test(text))          return 8;
+    if (/look.alike/i.test(typeDesc))                     return 4; // FQHC Look-Alike
+    if (/grantee/i.test(typeDesc))                        return 6; // Full FQHC grantee
+    return 5; // Standard community health center
+  }
+
   // Group by state to log per-state counts
   const byState: Record<string, ResourceRow[]> = {};
 
@@ -306,6 +319,8 @@ async function seedHRSA(existing: Set<string>) {
     const phone    = csvGet(row, headers, "site telephone number");
     const website  = csvGet(row, headers, "site web address");
     const statusRaw = csvGet(row, headers, "site status description").toLowerCase();
+    // Type field present in newer HRSA exports; gracefully absent in older ones
+    const typeDesc  = csvGet(row, headers, "health center type", "site type description", "");
 
     // HRSA CSV uses Y=lat, X=lng (geocoding artifact coordinates)
     const latRaw = csvGet(
@@ -356,6 +371,7 @@ async function seedHRSA(existing: Set<string>) {
       website:  website || undefined,
       urgent:   false,
       verified: true,
+      priority: hrsaPriority(name, typeDesc),
     });
   }
 
@@ -455,7 +471,7 @@ async function seedOSMShelters(existing: Set<string>) {
             lat: geo.lat, lng: geo.lng,
             phone:   phone   || undefined,
             website: website || undefined,
-            urgent: false, verified: false,
+            urgent: false, verified: false, priority: 5,
           });
         } else {
           records.push({
@@ -466,7 +482,7 @@ async function seedOSMShelters(existing: Set<string>) {
             lat: Number(lat), lng: Number(lon),
             phone:   phone   || undefined,
             website: website || undefined,
-            urgent: false, verified: false,
+            urgent: false, verified: false, priority: 5,
           });
         }
       }
@@ -742,6 +758,7 @@ async function seedLSC(existing: Set<string>) {
       website:  org.website,
       urgent:   false,
       verified: true,
+      priority: 7, // LSC-funded legal orgs are directly relevant to refugees
     });
   }
 
