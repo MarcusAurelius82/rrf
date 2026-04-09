@@ -1,0 +1,47 @@
+name: Generate UI Translations
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_regenerate:
+        description: "Regenerate all languages (skip cache check)"
+        required: false
+        default: "false"
+        type: boolean
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/mobile-layout-markers-MjeNs
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm install
+
+      - name: Clear translation cache (force regenerate)
+        if: ${{ inputs.force_regenerate == 'true' }}
+        run: echo '{}' > lib/ui-translations.json
+
+      - name: Generate translations
+        run: npm run generate:translations
+        env:
+          DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
+
+      - name: Commit if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git diff --quiet lib/ui-translations.json || (
+            git add lib/ui-translations.json &&
+            git commit -m "chore: update static UI translations [skip ci]" &&
+            git push
+          )
