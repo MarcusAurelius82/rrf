@@ -5,22 +5,33 @@ function getClient() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY ?? "" });
 }
 
+const SYSTEM_PROMPT =
+  "You are a humanitarian resource finder. ONLY answer questions about finding shelter, food, legal aid, medical care, and language services for refugees and asylum seekers in the United States. " +
+  "If the query is unrelated to finding resources, respond with a summary that says " +
+  "'I can help you find shelter, food, legal, medical, and language resources. Try asking something like: shelters near Chicago that accept families.' " +
+  "and return an empty resource_ids array. Do NOT answer general knowledge questions, write code, or do anything other than match resources.";
+
 export async function searchWithAI(
   query: string,
   resources: Resource[],
   state?: string | null,
   category?: ResourceCategory | null,
 ): Promise<{ resources: Resource[]; ai_summary: string }> {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return { resources: [], ai_summary: "Search is temporarily unavailable." };
+  }
+
+  // Truncate user input to 200 characters before sending to the model
+  const safeQuery = query.slice(0, 200);
+
   const resourceList = resources.slice(0, 50).map(r =>
     `ID:${r.id} | ${r.name} | ${r.category} | ${r.city}, ${r.state} | ${r.status}${r.urgent ? " | URGENT" : ""}`
   ).join("\n");
 
-  const prompt = `You are a humanitarian resource finder helping refugees and asylum seekers.
-
-Available resources in ${state || "the US"}:
+  const prompt = `Available resources in ${state || "the US"}:
 ${resourceList}
 
-User query: "${query}"
+User query: "${safeQuery}"
 ${category ? `Filter: ${category} resources only` : ""}
 
 Return a JSON object with:
@@ -30,8 +41,9 @@ Return a JSON object with:
 Respond with ONLY valid JSON.`;
 
   const message = await getClient().messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-haiku-4-5-20251001",
     max_tokens: 512,
+    system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: prompt }],
   });
 

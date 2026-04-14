@@ -35,6 +35,7 @@ export default function MapPage() {
   const [currentLang, setCurrentLang] = useState("EN");
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
   const [flyToCoords, setFlyToCoords] = useState<[number, number] | null>(null);
+  const [aiSummary, setAiSummary] = useState<string | undefined>();
 
   // Mobile drawer state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -115,6 +116,7 @@ export default function MapPage() {
     setSearchQuery(query);
     if (!query.trim()) {
       setFilteredResources(resources);
+      setAiSummary(undefined);
       return;
     }
     setIsLoading(true);
@@ -122,12 +124,17 @@ export default function MapPage() {
       const res = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, category: activeCategory }),
+        body: JSON.stringify({ query, category: activeCategory, state: selectedState }),
       });
       const { data } = await res.json();
       setFilteredResources(data?.resources || []);
-    } catch (err) { console.error(err); }
-    finally { setIsLoading(false); }
+      setAiSummary(data?.ai_summary || undefined);
+    } catch (err) {
+      console.error(err);
+      setAiSummary(undefined);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   // Location search (city/zip) — sort by proximity and fly map there
@@ -217,6 +224,7 @@ export default function MapPage() {
             totalCount={filteredResources.length}
             selectedState={selectedState}
             isLoading={isLoading}
+            aiSummary={aiSummary}
             onSearch={handleSearch}
             searchQuery={searchQuery}
             onSearchChange={handleSearch}

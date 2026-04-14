@@ -33,6 +33,7 @@ export function ResourcePanel({
   totalCount = 0,
   selectedState,
   isLoading,
+  aiSummary,
   onSearch,
   searchQuery,
   onSearchChange,
@@ -98,7 +99,17 @@ export function ResourcePanel({
           onChange={onSearchChange}
           onSearch={onSearch}
           placeholder={t("SEARCH_PLACEHOLDER")}
+          aiEnabled
+          isLoading={isLoading}
         />
+        {/* AI summary */}
+        {aiSummary && !isLoading && (
+          <div className="mt-2 px-2 py-1.5 rounded bg-accent/10 border border-accent/20">
+            <p className="font-mono text-[9px] text-accent/90 leading-relaxed tracking-[0.04em]">
+              {aiSummary}
+            </p>
+          </div>
+        )}
         {/* Documentation filter */}
         <div className="mt-2.5 flex flex-col xs:flex-row gap-1.5" role="group" aria-label="Filter by documentation requirement">
           {(["all", "none", "id_only"] as DocFilter[]).map(f => (
