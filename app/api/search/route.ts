@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { query, category, state } = await request.json();
+    const { query, category, state, bounds } = await request.json();
     if (!query?.trim()) {
       return NextResponse.json<ApiResponse<never>>({ error: "Query required" }, { status: 400 });
     }
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch a candidate pool by location — do NOT use textSearch here.
     // The AI handles semantic matching; the DB just provides the pool.
-    // Priority: state filter > US-wide bounds fallback.
+    // Priority: state filter > current map viewport > US-wide bbox fallback.
     let q = supabase
       .from("resources")
       .select("*")
@@ -51,11 +51,14 @@ export async function POST(request: NextRequest) {
 
     if (state) {
       q = q.eq("state", state);
-    } else {
-      // US bounding box fallback when no state is selected
+    } else if (bounds) {
+      // Use the current map viewport so results are geographically relevant
+      // to wherever the user is looking — e.g. zoomed into SF shows SF food
       q = q
-        .gte("lat", 24).lte("lat", 49)
-        .gte("lng", -125).lte("lng", -66);
+        .gte("lat", bounds.south).lte("lat", bounds.north)
+        .gte("lng", bounds.west).lte("lng", bounds.east);
+    } else {
+      q = q.gte("lat", 24).lte("lat", 49).gte("lng", -125).lte("lng", -66);
     }
 
     if (category) q = q.eq("category", category as ResourceCategory);
