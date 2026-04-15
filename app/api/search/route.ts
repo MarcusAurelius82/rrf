@@ -4,8 +4,6 @@ import { searchWithAI } from "@/lib/anthropic";
 import { ApiResponse, Resource, ResourceCategory } from "@/types";
 
 // Simple in-memory rate limiter: 10 requests per minute per IP.
-// Not persistent across serverless restarts — good enough to stop
-// accidental request loops, not intended as DDoS protection.
 const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
 const RATE_LIMIT_MAX = 10;
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -41,15 +39,24 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient();
 
+    // Fetch a candidate pool by location — do NOT use textSearch here.
+    // The AI handles semantic matching; the DB just provides the pool.
+    // Priority: state filter > US-wide bounds fallback.
     let q = supabase
       .from("resources")
       .select("*")
       .eq("verified", true)
-      .textSearch("search_vector", query, { type: "websearch", config: "english" })
-      .gte("lat", 24).lte("lat", 49)
-      .gte("lng", -125).lte("lng", -66)
       .order("urgent", { ascending: false })
       .limit(50);
+
+    if (state) {
+      q = q.eq("state", state);
+    } else {
+      // US bounding box fallback when no state is selected
+      q = q
+        .gte("lat", 24).lte("lat", 49)
+        .gte("lng", -125).lte("lng", -66);
+    }
 
     if (category) q = q.eq("category", category as ResourceCategory);
 
