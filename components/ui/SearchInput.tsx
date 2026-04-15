@@ -8,6 +8,7 @@ interface SearchInputProps {
   onSearch?: (val: string) => void;
   placeholder?: string;
   aiEnabled?: boolean;
+  isLoading?: boolean;
   className?: string;
   debounceMs?: number;
 }
@@ -18,6 +19,7 @@ export function SearchInput({
   onSearch,
   placeholder,
   aiEnabled,
+  isLoading,
   className,
   debounceMs = 300,
 }: SearchInputProps) {
@@ -69,10 +71,12 @@ export function SearchInput({
         <div
           className="absolute right-2 flex items-center gap-1 pointer-events-none"
           aria-hidden="true"
-          title="AI-powered search"
+          title={isLoading ? "AI searching…" : "AI-powered search"}
         >
-          <span className="w-1 h-1 rounded-full bg-[#2563eb] animate-pulse" />
-          <span className="font-mono text-[8px] text-[#2563eb] tracking-[0.08em]">AI</span>
+          <span className={cn("w-1 h-1 rounded-full bg-[#2563eb]", isLoading ? "animate-ping" : "animate-pulse")} />
+          <span className="font-mono text-[8px] text-[#2563eb] tracking-[0.08em]">
+            {isLoading ? "…" : "AI"}
+          </span>
         </div>
       )}
     </div>

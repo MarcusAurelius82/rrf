@@ -63,6 +63,7 @@ interface MapViewProps {
   onSearch?: (query: string) => void;
   onMapTap?: () => void;
   flyToCoords?: [number, number] | null;
+  onBoundsChange?: (bounds: { north: number; south: number; east: number; west: number }) => void;
 }
 
 const STATE_CENTROIDS: Record<string, [number, number]> = {
@@ -165,6 +166,7 @@ function setupMapLayers(m: mapboxgl.Map) {
     cluster: true,
     clusterMaxZoom: 11,
     clusterRadius: 40,
+    clusterMinPoints: 6,
   });
 
   // Cluster bubble
@@ -284,16 +286,19 @@ export function MapView({
   onSearch,
   onMapTap,
   flyToCoords,
+  onBoundsChange,
 }: MapViewProps) {
   const { theme } = useTheme();
   const mapContainer   = useRef<HTMLDivElement>(null);
   const map            = useRef<mapboxgl.Map | null>(null);
   const popupRef       = useRef<mapboxgl.Popup | null>(null);
   const geocodingRef   = useRef(false);
-  const onSelectRef    = useRef(onSelectState);
-  onSelectRef.current  = onSelectState; // always latest without re-init
-  const onMapTapRef    = useRef(onMapTap);
-  onMapTapRef.current  = onMapTap;
+  const onSelectRef        = useRef(onSelectState);
+  onSelectRef.current       = onSelectState; // always latest without re-init
+  const onMapTapRef        = useRef(onMapTap);
+  onMapTapRef.current       = onMapTap;
+  const onBoundsChangeRef  = useRef(onBoundsChange);
+  onBoundsChangeRef.current = onBoundsChange;
 
   const [mapLoaded, setMapLoaded] = useState(false);
   const [clicking, setClicking]   = useState(false);
@@ -338,12 +343,23 @@ export function MapView({
       // Restore selected-pin filter
       const sel = selectedResourceIdRef.current;
       map.current.setFilter("selected-pin-ring", ["==", ["get", "primary_id"], sel ?? "__none__"]);
+      // Emit initial bounds so the panel list populates immediately
+      const b = map.current.getBounds();
+      if (b) onBoundsChangeRef.current?.({
+        north: b.getNorth(), south: b.getSouth(),
+        east:  b.getEast(),  west:  b.getWest(),
+      });
     });
 
     map.current.on("moveend", () => {
       if (!map.current) return;
       const c = map.current.getCenter();
       setMapCenter({ lat: c.lat, lng: c.lng });
+      const b = map.current.getBounds();
+      if (b) onBoundsChangeRef.current?.({
+        north: b.getNorth(), south: b.getSouth(),
+        east:  b.getEast(),  west:  b.getWest(),
+      });
     });
 
     // Click map → reverse-geocode → select state; collapse bottom sheet if not on a pin
@@ -439,7 +455,7 @@ export function MapView({
         center: coord,
         zoom: Math.max(zoom, 10),
         duration: 800,
-        ...(isMobile ? { padding: { top: 80, bottom: 260, left: 16, right: 16 } } : {}),
+        ...(isMobile ? { padding: { top: 80, bottom: 180, left: 16, right: 16 } } : {}),
       });
     }
   }, [selectedResourceId, mapLoaded, resources]);
@@ -471,7 +487,7 @@ export function MapView({
       zoom: 11,
       duration: 900,
       essential: true,
-      ...(isMobile ? { padding: { top: 80, bottom: 260, left: 16, right: 16 } } : {}),
+      ...(isMobile ? { padding: { top: 80, bottom: 180, left: 16, right: 16 } } : {}),
     });
   }, [flyToCoords, mapLoaded]);
 

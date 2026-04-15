@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Resource, ResourceCategory } from "@/types";
 import { CATEGORY_CONFIG, cn } from "@/lib/utils";
+import { useT, type UIKey } from "@/contexts/TranslationContext";
 
 interface Suggestion {
   label: string;
@@ -31,17 +32,23 @@ function getSuggestions(query: string, resources: Resource[]): Suggestion[] {
   }
 
   // Category keywords
+  let hasCategoryMatch = false;
   (Object.entries(CATEGORY_CONFIG) as [ResourceCategory, (typeof CATEGORY_CONFIG)[ResourceCategory]][])
     .forEach(([, cat]) => {
       if (cat.label.toLowerCase().includes(q) && !seen.has(cat.label)) {
         seen.add(cat.label);
+        hasCategoryMatch = true;
         suggestions.push({ label: cat.label, sub: "category", value: cat.label, icon: cat.icon, type: "category" });
       }
     });
 
-  // Cities
+  // Cities — match plain city name OR "city state" / "city, state" patterns
   const cityMap = new Map<string, Resource>();
-  resources.filter(r => r.city.toLowerCase().includes(q)).forEach(r => {
+  resources.filter(r => {
+    const c  = r.city.toLowerCase();
+    const cs = `${r.city} ${r.state}`.toLowerCase();
+    return c.includes(q) || cs.startsWith(q);
+  }).forEach(r => {
     const key = `${r.city}, ${r.state}`;
     if (!cityMap.has(key)) cityMap.set(key, r);
   });
@@ -51,6 +58,12 @@ function getSuggestions(query: string, resources: Resource[]): Suggestion[] {
       suggestions.push({ label: cityState, sub: "city", value: cityState, icon: "⊙", type: "city" });
     }
   });
+
+  // If nothing location-related matched in the DB, add a synthetic "search nearby" suggestion
+  // so the user can still geocode any city name even with no local resources
+  if (cityMap.size === 0 && !hasCategoryMatch && q.length >= 3) {
+    suggestions.unshift({ label: query.trim(), sub: "search nearby", value: query.trim(), icon: "⊙", type: "city" });
+  }
 
   // Resource names
   resources
@@ -72,16 +85,16 @@ function getSuggestions(query: string, resources: Resource[]): Suggestion[] {
   return suggestions.slice(0, 6);
 }
 
-async function geocodeLocation(query: string): Promise<[number, number] | null> {
+async function geocodeLocation(query: string): Promise<{ coords: [number, number]; relevance: number } | null> {
   try {
     const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
     const url =
       `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json` +
-      `?country=US&access_token=${token}`;
-    const res = await fetch(url);
-    const json = await res.json() as { features?: Array<{ center?: [number, number] }> };
-    const center = json.features?.[0]?.center;
-    if (center && center.length === 2) return center;
+      `?types=place,postcode&country=US&access_token=${token}`;
+    const res  = await fetch(url);
+    const json = await res.json() as { features?: Array<{ center?: [number, number]; relevance?: number }> };
+    const f    = json.features?.[0];
+    if (f?.center && f.center.length === 2) return { coords: f.center, relevance: f.relevance ?? 0 };
   } catch { /* ignore */ }
   return null;
 }
@@ -95,6 +108,12 @@ interface MapSearchInputProps {
   className?: string;
 }
 
+const SUB_KEY: Record<string, UIKey> = {
+  "search nearby": "SUGG_NEARBY",
+  "city":          "SUGG_CITY",
+  "category":      "SUGG_CATEGORY",
+};
+
 export function MapSearchInput({
   resources,
   value,
@@ -103,6 +122,7 @@ export function MapSearchInput({
   placeholder,
   className,
 }: MapSearchInputProps) {
+  const t = useT();
   const [localValue, setLocalValue] = useState(value);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -125,12 +145,47 @@ export function MapSearchInput({
     }, 180);
   }
 
-  function commitText(val: string) {
+  async function commitText(val: string) {
     setLocalValue(val);
     setSuggestions([]);
     setOpen(false);
-    onSearch(val);
     inputRef.current?.blur();
+
+    const q = val.trim();
+    if (!q) { onSearch(""); return; }
+
+    // Zip code
+    if (/^\d{5}$/.test(q) && onLocationSearch) {
+      const result = await geocodeLocation(q);
+      if (result) { onLocationSearch(result.coords, q); return; }
+    }
+
+    if (onLocationSearch) {
+      // City name or "City STATE" / "City, STATE" — match against loaded resources first
+      const normalized = q.toLowerCase().replace(/,\s*/g, " ").trim();
+      const match = resources.find(r => {
+        const c  = r.city.toLowerCase();
+        const cs = `${r.city} ${r.state}`.toLowerCase();
+        return c === normalized || cs === normalized;
+      });
+      if (match) {
+        const label  = `${match.city}, ${match.state}`;
+        const result = await geocodeLocation(label);
+        if (result) { onLocationSearch(result.coords, label); return; }
+      }
+
+      // No resource match — try geocoding the raw query directly.
+      // Only accept high-confidence results (≥ 0.5) so service keywords
+      // like "shelter" don't accidentally fly to Shelter, MT.
+      const fallback = await geocodeLocation(q);
+      if (fallback && fallback.relevance >= 0.5) {
+        onLocationSearch(fallback.coords, q);
+        return;
+      }
+    }
+
+    // Fall back to full-text resource search
+    onSearch(val);
   }
 
   async function commitSuggestion(s: Suggestion) {
@@ -141,9 +196,9 @@ export function MapSearchInput({
 
     // City or zip → geocode and show nearest resources
     if ((s.type === "city" || s.type === "zip") && onLocationSearch) {
-      const coords = await geocodeLocation(s.value);
-      if (coords) {
-        onLocationSearch(coords, s.label);
+      const result = await geocodeLocation(s.value);
+      if (result) {
+        onLocationSearch(result.coords, s.label);
         return;
       }
     }
@@ -156,6 +211,8 @@ export function MapSearchInput({
       e.preventDefault();
       if (activeIdx >= 0 && suggestions[activeIdx]) {
         commitSuggestion(suggestions[activeIdx]);
+      } else if (suggestions.length > 0) {
+        commitSuggestion(suggestions[0]);
       } else {
         commitText(localValue);
       }
@@ -186,7 +243,7 @@ export function MapSearchInput({
           onKeyDown={handleKeyDown}
           onFocus={() => { if (localValue.length >= 2) setOpen(true); }}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
-          placeholder={placeholder ?? "Search resources…"}
+          placeholder={placeholder ?? t("SEARCH_MAP_PLACEHOLDER")}
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="none"
@@ -233,13 +290,13 @@ export function MapSearchInput({
                   <span className="font-mono text-[12px] text-content-primary truncate block">{s.label}</span>
                   {s.sub && (
                     <span className="font-mono text-[9px] text-content-muted tracking-[0.06em] uppercase">
-                      {s.sub}
+                      {SUB_KEY[s.sub] ? t(SUB_KEY[s.sub]) : s.sub}
                     </span>
                   )}
                 </span>
                 {(s.type === "city" || s.type === "zip") && (
                   <span className="font-mono text-[8px] text-accent tracking-[0.08em] flex-shrink-0">
-                    NEARBY
+                    {t("NEARBY")}
                   </span>
                 )}
               </button>

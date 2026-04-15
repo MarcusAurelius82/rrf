@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Navbar } from "@/components/ui/Navbar";
 import { Sidebar } from "@/components/ui/Sidebar";
 import { MapView } from "@/components/map/MapView";
@@ -10,6 +10,7 @@ import { ReportModal } from "@/components/ui/ReportModal";
 import { Resource, ResourceCategory } from "@/types";
 import { CATEGORY_CONFIG } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { TranslationProvider } from "@/contexts/TranslationContext";
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
@@ -21,23 +22,42 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+type MapBounds = { north: number; south: number; east: number; west: number };
+
 export default function MapPage() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [filteredResources, setFilteredResources] = useState<Resource[]>([]);
+  const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
   const [selectedState, setSelectedState] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<ResourceCategory | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [currentLang, setCurrentLang] = useState("EN");
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
-  const [bottomSheetCollapsed, setBottomSheetCollapsed] = useState(false);
   const [flyToCoords, setFlyToCoords] = useState<[number, number] | null>(null);
+  const [aiSummary, setAiSummary] = useState<string | undefined>();
 
   // Mobile drawer state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // Report modal
   const [reportModalOpen, setReportModalOpen] = useState(false);
+
+  // Refs for debounced viewport fetch
+  const boundsDebounceRef  = useRef<NodeJS.Timeout>();
+  const fetchControllerRef = useRef<AbortController | null>(null);
+  const mapBoundsRef       = useRef<MapBounds | null>(null);
+  const activeCategoryRef  = useRef(activeCategory);
+  activeCategoryRef.current = activeCategory;
+
+  // Resources visible in the current map viewport — drives the list panels.
+  // Since the API already filters by bbox, this is mostly a no-op safety check.
+  const visibleResources = mapBounds
+    ? filteredResources.filter(r =>
+        r.lat >= mapBounds.south && r.lat <= mapBounds.north &&
+        r.lng >= mapBounds.west  && r.lng <= mapBounds.east
+      )
+    : filteredResources;
 
   // Prevent body scroll when a drawer is open on mobile
   useEffect(() => {
@@ -46,28 +66,57 @@ export default function MapPage() {
     return () => document.body.classList.remove("drawer-open");
   }, [mobileSidebarOpen, reportModalOpen]);
 
-  // Fetch resources nationwide — state selection only flies the map
-  useEffect(() => {
+  // ── Viewport fetch ────────────────────────────────────────────────────────
+  // Fetches resources for the current bbox + category. Cancels in-flight
+  // requests when a new one arrives so stale data never overwrites fresh data.
+  function fetchViewport(bounds: MapBounds, category: ResourceCategory | null) {
+    fetchControllerRef.current?.abort();
+    fetchControllerRef.current = new AbortController();
+
     setIsLoading(true);
     const params = new URLSearchParams();
-    if (activeCategory) params.set("category", activeCategory);
+    if (category) params.set("category", category);
+    params.set("min_lat", bounds.south.toFixed(6));
+    params.set("max_lat", bounds.north.toFixed(6));
+    params.set("min_lng", bounds.west.toFixed(6));
+    params.set("max_lng", bounds.east.toFixed(6));
 
-    fetch(`/api/resources?${params}`)
+    fetch(`/api/resources?${params}`, { signal: fetchControllerRef.current.signal })
       .then(r => r.json())
       .then(({ data }) => {
         setResources(data || []);
         setFilteredResources(data || []);
-        setSearchQuery(""); // clear search when base data changes
+        setSearchQuery("");
       })
-      .catch(console.error)
+      .catch(err => { if (err.name !== "AbortError") console.error(err); })
       .finally(() => setIsLoading(false));
+  }
+
+  // Bounds change from MapView — debounce 400ms so we don't fire on every
+  // pixel of a pan, then fetch full fidelity data for the new viewport.
+  const handleBoundsChange = useCallback((bounds: MapBounds) => {
+    setMapBounds(bounds);
+    mapBoundsRef.current = bounds;
+    clearTimeout(boundsDebounceRef.current);
+    boundsDebounceRef.current = setTimeout(() => {
+      fetchViewport(bounds, activeCategoryRef.current);
+    }, 400);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-fetch when category changes, using the last known bounds
+  useEffect(() => {
+    if (!mapBoundsRef.current) return;
+    fetchViewport(mapBoundsRef.current, activeCategory);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCategory]);
 
-  // Full-text search via Postgres
+  // ── Search ────────────────────────────────────────────────────────────────
   async function handleSearch(query: string) {
     setSearchQuery(query);
     if (!query.trim()) {
       setFilteredResources(resources);
+      setAiSummary(undefined);
       return;
     }
     setIsLoading(true);
@@ -75,15 +124,20 @@ export default function MapPage() {
       const res = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, category: activeCategory }),
+        body: JSON.stringify({ query, category: activeCategory, state: selectedState }),
       });
       const { data } = await res.json();
       setFilteredResources(data?.resources || []);
-    } catch (err) { console.error(err); }
-    finally { setIsLoading(false); }
+      setAiSummary(data?.ai_summary || undefined);
+    } catch (err) {
+      console.error(err);
+      setAiSummary(undefined);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
-  // Location search (city/zip) — sort resources by proximity, fly map there
+  // Location search (city/zip) — sort by proximity and fly map there
   function handleLocationSearch(coords: [number, number], label: string) {
     const [lng, lat] = coords;
     setFlyToCoords(coords);
@@ -98,10 +152,8 @@ export default function MapPage() {
     setSelectedState(state);
   }, []);
 
-  // Selecting a resource (pin tap) expands the bottom sheet
   const handleSelectResource = useCallback((id: string | null) => {
     setSelectedResourceId(id);
-    if (id) setBottomSheetCollapsed(false);
   }, []);
 
   const categoryCounts = Object.fromEntries(
@@ -109,6 +161,7 @@ export default function MapPage() {
   );
 
   return (
+    <TranslationProvider lang={currentLang}>
     <div className="flex flex-col h-screen overflow-hidden">
       <Navbar currentLang={currentLang} onLanguageChange={setCurrentLang} />
 
@@ -149,8 +202,8 @@ export default function MapPage() {
           onMobileSidebarToggle={() => setMobileSidebarOpen(o => !o)}
           selectedResourceId={selectedResourceId}
           onSelectResource={handleSelectResource}
-          onMapTap={() => setBottomSheetCollapsed(true)}
           flyToCoords={flyToCoords}
+          onBoundsChange={handleBoundsChange}
         />
 
         {/* Mobile search bar — floats over map, leaves room for hamburger button */}
@@ -167,9 +220,11 @@ export default function MapPage() {
         {/* Resource panel — large screens only (1024px+) */}
         <div className="hidden lg:block relative">
           <ResourcePanel
-            resources={filteredResources}
+            resources={visibleResources}
+            totalCount={filteredResources.length}
             selectedState={selectedState}
             isLoading={isLoading}
+            aiSummary={aiSummary}
             onSearch={handleSearch}
             searchQuery={searchQuery}
             onSearchChange={handleSearch}
@@ -181,14 +236,13 @@ export default function MapPage() {
 
       {/* Mobile bottom sheet — category pills + horizontal card scroll */}
       <MobileBottomSheet
-        resources={filteredResources}
+        resources={visibleResources}
+        totalCount={filteredResources.length}
         activeCategory={activeCategory}
-        onCategoryChange={cat => { setActiveCategory(cat); setBottomSheetCollapsed(false); }}
+        onCategoryChange={setActiveCategory}
         isLoading={isLoading}
         selectedResourceId={selectedResourceId}
         onSelectResource={handleSelectResource}
-        collapsed={bottomSheetCollapsed}
-        onCollapse={() => setBottomSheetCollapsed(true)}
       />
 
       {/* Report Missing Resource modal */}
@@ -199,5 +253,6 @@ export default function MapPage() {
         />
       )}
     </div>
+    </TranslationProvider>
   );
 }
