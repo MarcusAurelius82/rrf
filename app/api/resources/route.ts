@@ -28,6 +28,12 @@ export async function GET(request: NextRequest) {
     const maxLng = searchParams.get("max_lng");
     const hasBbox = minLat && maxLat && minLng && maxLng;
 
+    // Treat a bbox wider than ~55° longitude as "national overview" and apply
+    // a tight cap — no need to pull hundreds of rows when the map is zoomed out
+    // to show the whole country. State-level or city-level views get the full cap.
+    const bboxWidthDeg = hasBbox ? parseFloat(maxLng!) - parseFloat(minLng!) : 0;
+    const isNationalView = !hasBbox || bboxWidthDeg > 55;
+
     const supabase = createAdminClient();
 
     const baseQuery = (cat?: string) => {
@@ -48,9 +54,10 @@ export async function GET(request: NextRequest) {
         q = q.gte("lat", 24).lte("lat", 49).gte("lng", -125).lte("lng", -66);
       }
 
-      // Apply per-category viewport cap so medical doesn't crowd out others
-      if (hasBbox && cat) {
-        q = q.limit(VIEWPORT_CAP[cat] ?? 200);
+      // Apply per-category cap. National view gets a tight cap (20/cat) since
+      // zoomed-out markers all cluster anyway — no point fetching 1000 rows.
+      if (cat) {
+        q = q.limit(isNationalView ? 20 : (VIEWPORT_CAP[cat] ?? 200));
       }
 
       return q;
@@ -69,8 +76,8 @@ export async function GET(request: NextRequest) {
       data = rows ?? [];
     } else {
       const CATEGORIES = ["medical", "shelter", "food", "legal", "language"] as const;
-      // National fallback cap (no bbox): keep it fast with a per-category limit
-      const NATIONAL_CAP = state ? 20 : 50;
+      // National fallback cap: tight when zoomed out, generous when state is selected
+      const NATIONAL_CAP = isNationalView ? 20 : (state ? 50 : 20);
 
       const results = await Promise.all(
         CATEGORIES.map(cat => {
