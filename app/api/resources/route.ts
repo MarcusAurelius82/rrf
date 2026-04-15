@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
     } else {
       const CATEGORIES = ["medical", "shelter", "food", "legal", "language"] as const;
       // National fallback cap: tight when zoomed out, generous when state is selected
-      const NATIONAL_CAP = isNationalView ? 20 : (state ? 50 : 20);
+      const NATIONAL_CAP = isNationalView ? 50 : (state ? 50 : 20);
 
       const results = await Promise.all(
         CATEGORIES.map(cat => {

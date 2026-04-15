@@ -47,8 +47,7 @@ export async function POST(request: NextRequest) {
       .from("resources")
       .select("*")
       .eq("verified", true)
-      .order("urgent",   { ascending: false })
-      .order("priority", { ascending: false })
+      .order("urgent", { ascending: false })
       .limit(100);
 
     if (state) {
