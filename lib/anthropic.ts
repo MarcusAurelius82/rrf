@@ -5,11 +5,17 @@ function getClient() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY ?? "" });
 }
 
+// Only reject queries that are clearly not about finding humanitarian resources.
+// Do NOT reject valid queries just because the resource list is empty — that
+// just means we don't have coverage in that area yet.
 const SYSTEM_PROMPT =
-  "You are a humanitarian resource finder. ONLY answer questions about finding shelter, food, legal aid, medical care, and language services for refugees and asylum seekers in the United States. " +
-  "If the query is unrelated to finding resources, respond with a summary that says " +
+  "You are a humanitarian resource finder for refugees and asylum seekers in the United States. " +
+  "Your only job is to match users to shelter, food, legal aid, medical care, and language services. " +
+  "If the resource list is empty, set resource_ids to [] and write a helpful summary explaining no results were found nearby. " +
+  "Only if the query is clearly unrelated to finding any kind of humanitarian resource (e.g. asking you to write code, answer trivia, or do math) " +
+  "should you set resource_ids to [] and set summary to: " +
   "'I can help you find shelter, food, legal, medical, and language resources. Try asking something like: shelters near Chicago that accept families.' " +
-  "and return an empty resource_ids array. Do NOT answer general knowledge questions, write code, or do anything other than match resources.";
+  "Do NOT answer general knowledge questions, write code, or do anything other than match resources.";
 
 export async function searchWithAI(
   query: string,
@@ -19,6 +25,14 @@ export async function searchWithAI(
 ): Promise<{ resources: Resource[]; ai_summary: string }> {
   if (!process.env.ANTHROPIC_API_KEY) {
     return { resources: [], ai_summary: "Search is temporarily unavailable." };
+  }
+
+  // If Supabase returned no candidates, skip the AI call entirely
+  if (resources.length === 0) {
+    return {
+      resources: [],
+      ai_summary: `No resources found${state ? ` in ${state}` : " in this area"} matching your search. Try broadening your query or selecting a different state.`,
+    };
   }
 
   // Truncate user input to 200 characters before sending to the model
