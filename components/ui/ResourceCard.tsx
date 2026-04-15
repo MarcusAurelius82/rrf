@@ -31,19 +31,15 @@ function formatHours(hours: Record<string, string>): string {
 }
 
 const DOC_BADGE_STYLE: Record<DocumentationRequired, string> = {
-  none:              "text-green-400 bg-green-500/10 border-green-500/20",
-  id_only:           "text-blue-400 bg-blue-500/10 border-blue-500/20",
-  legal_status:      "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
-  benefits_eligible: "text-orange-400 bg-orange-500/10 border-orange-500/20",
-  unknown:           "text-content-muted bg-border/30 border-border",
+  none:    "text-green-400 bg-green-500/10 border-green-500/20",
+  id_only: "text-blue-400 bg-blue-500/10 border-blue-500/20",
+  unknown: "text-content-muted bg-border/30 border-border",
 };
 
 const DOC_BADGE_KEY: Record<DocumentationRequired, UIKey> = {
-  none:              "NO_DOCS",
-  id_only:           "ID_ONLY",
-  legal_status:      "LEGAL_STATUS",
-  benefits_eligible: "PROG_ELIGIBLE",
-  unknown:           "CALL_AHEAD",
+  none:    "NO_DOCS",
+  id_only: "ID_ONLY",
+  unknown: "CALL_AHEAD",
 };
 
 interface ResourceCardProps {
