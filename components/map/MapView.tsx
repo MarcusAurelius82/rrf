@@ -434,17 +434,21 @@ export function MapView({
     return () => { m.off("click", "resource-pins", handlePinClick); };
   }, [resources, mapLoaded]);
 
-  // ── Selected resource — update ring highlight + fly if off-screen ────────
+  // ── Selected resource — update ring highlight ────────────────────────────
   useEffect(() => {
     if (!mapLoaded || !map.current) return;
-    // Update the ring layer filter
     map.current.setFilter(
       "selected-pin-ring",
       ["==", ["get", "primary_id"], selectedResourceId ?? "__none__"]
     );
-    // Fly to the resource only when selected from the panel (i.e. not already visible)
-    if (!selectedResourceId) return;
-    const resource = resources.find(r => r.id === selectedResourceId);
+  }, [selectedResourceId, mapLoaded, resources]);
+
+  // ── Fly to selected resource — only when the selection itself changes ─────
+  // Intentionally uses resourcesRef (not resources) so this effect does NOT
+  // re-fire when the resource list refreshes after a viewport change.
+  useEffect(() => {
+    if (!mapLoaded || !map.current || !selectedResourceId) return;
+    const resource = resourcesRef.current.find(r => r.id === selectedResourceId);
     if (!resource) return;
     const coord = getSafeResourceCoord(resource);
     if (!coord) return;
@@ -458,7 +462,8 @@ export function MapView({
         ...(isMobile ? { padding: { top: 80, bottom: 180, left: 16, right: 16 } } : {}),
       });
     }
-  }, [selectedResourceId, mapLoaded, resources]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedResourceId, mapLoaded]);
 
   // ── Theme switch — swap style; style.load handler above re-adds everything ─
   const themeRef = useRef(theme);
