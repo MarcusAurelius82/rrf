@@ -18,7 +18,7 @@
     "generate:translations": "tsx scripts/generate-ui-translations.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.20.0",
+    "@anthropic-ai/sdk": "^0.39.0",
     "@clerk/nextjs": "^4.29.0",
     "@supabase/ssr": "^0.1.0",
     "@supabase/supabase-js": "^2.39.0",
