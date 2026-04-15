@@ -34,11 +34,8 @@ ${resourceList}
 User query: "${safeQuery}"
 ${category ? `Filter: ${category} resources only` : ""}
 
-Return a JSON object with:
-1. "resource_ids": array of IDs most relevant to the query (max 10, prioritize urgent)
-2. "summary": 1-2 sentence plain-language summary of what you found and why it's relevant
-
-Respond with ONLY valid JSON.`;
+Respond with ONLY a raw JSON object — no markdown, no code fences, no explanation:
+{"resource_ids": ["id1", "id2"], "summary": "1-2 sentence plain-language summary"}`;
 
   const message = await getClient().messages.create({
     model: "claude-haiku-4-5-20251001",
@@ -47,13 +44,22 @@ Respond with ONLY valid JSON.`;
     messages: [{ role: "user", content: prompt }],
   });
 
-  const text = message.content[0].type === "text" ? message.content[0].text : "{}";
+  const raw = message.content[0].type === "text" ? message.content[0].text : "{}";
+
+  // Strip markdown code fences (```json ... ``` or ``` ... ```) if present
+  const stripped = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+
+  // Extract the first {...} block in case the model adds prose around the JSON
+  const jsonMatch = stripped.match(/\{[\s\S]*\}/);
+  const jsonStr = jsonMatch ? jsonMatch[0] : stripped;
+
   try {
-    const parsed = JSON.parse(text);
+    const parsed = JSON.parse(jsonStr);
     const matchedIds = new Set<string>(parsed.resource_ids || []);
     const matched = resources.filter(r => matchedIds.has(r.id));
     return { resources: matched, ai_summary: parsed.summary || "" };
   } catch {
+    console.error("searchWithAI: failed to parse response:", raw);
     return { resources: [], ai_summary: "Unable to process search results." };
   }
 }
