@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { query, category, state, bounds } = await request.json();
+    const { query, category, state } = await request.json();
     if (!query?.trim()) {
       return NextResponse.json<ApiResponse<never>>({ error: "Query required" }, { status: 400 });
     }
@@ -40,23 +40,19 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient();
 
     // Fetch a candidate pool by location — do NOT use textSearch here.
-    // The AI handles semantic matching; the DB just provides the pool.
-    // Priority: state filter > current map viewport > US-wide bbox fallback.
+    // The AI handles all semantic and geographic matching from the query text.
+    // Use a generous limit so local resources aren't crowded out by high-urgency
+    // resources elsewhere in the US.
     let q = supabase
       .from("resources")
       .select("*")
       .eq("verified", true)
-      .order("urgent", { ascending: false })
-      .limit(50);
+      .order("urgent",   { ascending: false })
+      .order("priority", { ascending: false })
+      .limit(100);
 
     if (state) {
       q = q.eq("state", state);
-    } else if (bounds) {
-      // Use the current map viewport so results are geographically relevant
-      // to wherever the user is looking — e.g. zoomed into SF shows SF food
-      q = q
-        .gte("lat", bounds.south).lte("lat", bounds.north)
-        .gte("lng", bounds.west).lte("lng", bounds.east);
     } else {
       q = q.gte("lat", 24).lte("lat", 49).gte("lng", -125).lte("lng", -66);
     }

@@ -124,12 +124,7 @@ export default function MapPage() {
       const res = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query,
-          category: activeCategory,
-          state: selectedState,
-          bounds: mapBoundsRef.current,
-        }),
+        body: JSON.stringify({ query, category: activeCategory, state: selectedState }),
       });
       const { data } = await res.json();
       setFilteredResources(data?.resources || []);
