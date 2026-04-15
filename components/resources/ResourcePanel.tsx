@@ -55,7 +55,7 @@ export function ResourcePanel({
 
   const filteredResources = docFilter === "all"
     ? resources
-    : resources.filter(r => r.documentation_required === docFilter);
+    : resources.filter(r => (r.documentation_required ?? "unknown") === docFilter);
 
   const urgentCount = filteredResources.filter(r => r.urgent).length;
 

@@ -1,6 +1,6 @@
 export type ResourceCategory = "shelter" | "food" | "legal" | "medical" | "language";
 export type ResourceStatus = "open" | "closed" | "closing_soon" | "appointment_only";
-export type DocumentationRequired = "none" | "id_only" | "legal_status" | "benefits_eligible" | "unknown";
+export type DocumentationRequired = "none" | "id_only" | "unknown";
 
 export interface Resource {
   id: string;
@@ -19,7 +19,7 @@ export interface Resource {
   languages?: string[];
   urgent: boolean;
   verified: boolean;
-  documentation_required: DocumentationRequired;
+  documentation_required: DocumentationRequired | null;
   created_at: string;
   updated_at: string;
 }
