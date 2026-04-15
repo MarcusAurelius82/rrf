@@ -11,6 +11,7 @@ import { Resource, ResourceCategory } from "@/types";
 import { CATEGORY_CONFIG } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { TranslationProvider } from "@/contexts/TranslationContext";
+import { useGeolocation } from "@/hooks/useGeolocation";
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
@@ -36,6 +37,13 @@ export default function MapPage() {
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
   const [flyToCoords, setFlyToCoords] = useState<[number, number] | null>(null);
   const [aiSummary, setAiSummary] = useState<string | undefined>();
+
+  // Geolocation — request on mount, fly to user on success
+  const { lat: userLat, lng: userLng, request: requestLocation } = useGeolocation();
+  useEffect(() => { requestLocation(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (userLat && userLng) setFlyToCoords([userLng, userLat]);
+  }, [userLat, userLng]);
 
   // Mobile drawer state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
