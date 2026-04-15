@@ -84,6 +84,31 @@ Respond with ONLY a raw JSON object — no markdown, no code fences, no explanat
   }
 }
 
+// Extract the US state code implied by a search query.
+// Haiku handles abbreviations ("sf"→CA), nicknames ("the 305"→FL),
+// and full names ("Chicago"→IL) far more reliably than regex + geocoding.
+// Returns a 2-letter state code or null if no location is implied.
+export async function extractStateFromQuery(query: string): Promise<string | null> {
+  if (!process.env.ANTHROPIC_API_KEY) return null;
+  try {
+    const message = await getClient().messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 10,
+      system:
+        "You extract US state codes from search queries. " +
+        "Reply with ONLY the 2-letter state code (e.g. CA, NY, TX) " +
+        "or the word 'none' if the query has no specific US location.",
+      messages: [{ role: "user", content: query.slice(0, 200) }],
+    });
+    const text =
+      message.content[0].type === "text"
+        ? message.content[0].text.trim().toUpperCase()
+        : "";
+    if (/^[A-Z]{2}$/.test(text) && text !== "NONE") return text;
+  } catch { /* ignore — fall back to broader search */ }
+  return null;
+}
+
 export async function triageUrgency(resourceDescription: string): Promise<boolean> {
   const message = await getClient().messages.create({
     model: "claude-haiku-4-5-20251001",
