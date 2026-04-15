@@ -38,8 +38,11 @@ export async function searchWithAI(
   // Truncate user input to 200 characters before sending to the model
   const safeQuery = query.slice(0, 200);
 
-  const resourceList = resources.slice(0, 50).map(r =>
-    `ID:${r.id} | ${r.name} | ${r.category} | ${r.city}, ${r.state} | ${r.status}${r.urgent ? " | URGENT" : ""}`
+  // Use sequential indices instead of raw UUIDs — avoids UUID hallucination
+  // where the model slightly mis-copies a long ID and the match silently fails.
+  const candidates = resources.slice(0, 50);
+  const resourceList = candidates.map((r, i) =>
+    `${i} | ${r.name} | ${r.category} | ${r.city}, ${r.state} | ${r.status}${r.urgent ? " | URGENT" : ""}`
   ).join("\n");
 
   const prompt = `Available resources in ${state || "the US"}:
@@ -48,8 +51,9 @@ ${resourceList}
 User query: "${safeQuery}"
 ${category ? `Filter: ${category} resources only` : ""}
 
+Return the indices (left-most number) of the most relevant resources (max 10, prioritize urgent).
 Respond with ONLY a raw JSON object — no markdown, no code fences, no explanation:
-{"resource_ids": ["id1", "id2"], "summary": "1-2 sentence plain-language summary"}`;
+{"indices": [0, 2, 5], "summary": "1-2 sentence plain-language summary"}`;
 
   const message = await getClient().messages.create({
     model: "claude-haiku-4-5-20251001",
@@ -69,8 +73,10 @@ Respond with ONLY a raw JSON object — no markdown, no code fences, no explanat
 
   try {
     const parsed = JSON.parse(jsonStr);
-    const matchedIds = new Set<string>(parsed.resource_ids || []);
-    const matched = resources.filter(r => matchedIds.has(r.id));
+    const indices: number[] = (parsed.indices || [])
+      .map(Number)
+      .filter((n: number) => Number.isInteger(n) && n >= 0 && n < candidates.length);
+    const matched = indices.map(i => candidates[i]);
     return { resources: matched, ai_summary: parsed.summary || "" };
   } catch {
     console.error("searchWithAI: failed to parse response:", raw);
